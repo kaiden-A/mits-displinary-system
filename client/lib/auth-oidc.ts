@@ -6,6 +6,7 @@ export const SESSION_COOKIE = "session";
 const ISSUER = process.env.ZITADEL_ISSUER!;
 const CLIENT_ID = process.env.ZITADEL_CLIENT_ID!;
 const ALLOWED_ORG_ID = process.env.ZITADEL_ALLOWED_ORG_ID!;
+const PROJECT_ID = process.env.ZITADEL_PROJECT_ID;
 const SESSION_SECRET = new TextEncoder().encode(process.env.NEXTAUTH_SECRET!);
 
 interface Discovery {
@@ -40,17 +41,26 @@ export async function buildAuthorizeUrl(
   nonce: string
 ) {
   const discovery = await getDiscovery();
+  const scopes = [
+    "openid",
+    "profile",
+    "email",
+    `urn:zitadel:iam:org:id:${ALLOWED_ORG_ID}`,
+    "urn:zitadel:iam:user:resourceowner",
+    "urn:zitadel:iam:org:roles",
+    "urn:zitadel:iam:org:project:roles",
+  ];
+  if (PROJECT_ID) {
+    scopes.push(
+      `urn:zitadel:iam:org:project:id:${PROJECT_ID}:aud`,
+      `urn:zitadel:iam:org:project:${PROJECT_ID}:roles`
+    );
+  }
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
     redirect_uri: redirectUri,
     response_type: "code",
-    scope: [
-      "openid",
-      "profile",
-      "email",
-      `urn:zitadel:iam:org:id:${ALLOWED_ORG_ID}`,
-      "urn:zitadel:iam:user:resourceowner",
-    ].join(" "),
+    scope: scopes.join(" "),
     state,
     nonce,
     code_challenge: codeChallenge,
@@ -99,22 +109,57 @@ export async function verifyIdToken(idToken: string, nonce: string) {
   return payload;
 }
 
-/** Best-effort role extraction from token claims (Zitadel project roles). */
+/** Best-effort role extraction from token claims (Zitadel org + project roles). */
 export function extractRoles(payload: Record<string, unknown>): string[] {
-  const roles: string[] = [];
-  const claimKeys = [
-    `urn:zitadel:iam:org:project:${process.env.ZITADEL_CLIENT_ID}:roles`,
-    "urn:zitadel:iam:org:project:roles",
-  ];
-  for (const key of claimKeys) {
-    const value = payload[key];
-    if (value && typeof value === "object") {
-      roles.push(...Object.keys(value as Record<string, unknown>));
-    } else if (Array.isArray(value)) {
-      roles.push(...value.map(String));
+  const roles = new Set<string>();
+
+  for (const value of [
+    payload["urn:zitadel:iam:org:project:roles"],
+    payload["urn:zitadel:iam:org:roles"],
+  ]) {
+    collectRoleKeys(value, roles);
+  }
+
+  // Zitadel may assert per-project claims: urn:zitadel:iam:org:project:{projectId}:roles
+  for (const [key, value] of Object.entries(payload)) {
+    if (key.startsWith("urn:zitadel:iam:org:project:") && key.endsWith(":roles")) {
+      collectRoleKeys(value, roles);
     }
   }
-  return roles;
+
+  const groups = payload.groups;
+  if (Array.isArray(groups)) {
+    groups.forEach((group) => roles.add(String(group)));
+  }
+
+  return [...roles];
+}
+
+/** Add role keys whose mapping shows the role is granted in the current context. */
+function collectRoleKeys(value: unknown, roles: Set<string>): void {
+  if (!value || typeof value !== "object") return;
+  for (const [role, mapping] of Object.entries(value as Record<string, unknown>)) {
+    // Zitadel maps each granted role to the org ids/domains it applies in;
+    // roles with empty mappings are not granted in the current context.
+    if (mapping && (typeof mapping === "object" || typeof mapping === "string")) {
+      roles.add(role);
+    }
+  }
+}
+
+/**
+ * Fetch roles from the userinfo endpoint. Zitadel asserts roles there when
+ * the project's "Assert Roles on Authentication" is enabled, even if the
+ * ID token does not carry them (that requires the app-level "User Roles
+ * Inside ID Token" setting).
+ */
+export async function fetchUserinfoRoles(accessToken: string): Promise<string[]> {
+  const discovery = await getDiscovery();
+  const res = await fetch(discovery.userinfo_endpoint, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) return [];
+  return extractRoles((await res.json()) as Record<string, unknown>);
 }
 
 export async function buildLogoutUrl(postLogoutRedirectUri: string, idTokenHint?: string) {

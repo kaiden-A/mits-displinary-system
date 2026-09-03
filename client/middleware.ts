@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import { getSessionFromCookies, SESSION_COOKIE, PW_COOKIE } from "@/lib/auth";
 import { canAccessRoute, isManager } from "@/lib/permissions";
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const session = await getSessionFromCookies(
     request.cookies.get(SESSION_COOKIE)?.value,
     request.cookies.get(PW_COOKIE)?.value

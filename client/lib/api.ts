@@ -7,6 +7,7 @@ export interface ApiError {
 export async function apiFetch<T>(path: string, token: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
+    signal: init?.signal || AbortSignal.timeout(10_000),
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,

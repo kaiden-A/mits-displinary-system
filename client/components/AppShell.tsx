@@ -28,25 +28,16 @@ function StaffShell({ session, children }: { session: Session; children: React.R
       <a href="#main-content" className="skip-link">Langkau ke kandungan utama</a>
       <aside className={`fixed inset-y-0 left-0 z-50 w-[280px] border-r border-brand-800 bg-brand-950 text-white transition-transform duration-200 lg:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="flex h-full flex-col">
-          <div className="border-b border-white/10 px-5 py-5">
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-gold-300/40 bg-brand-700 text-gold-200"><Icon name="shield" size={23} /></div>
-              <div className="min-w-0">
-                <p className="font-display text-xl font-semibold leading-none text-white">SPSM</p>
-                <p className="mt-1 truncate text-[10px] font-bold uppercase tracking-[0.14em] text-brand-200">MITS Selangor</p>
-              </div>
-              <button type="button" aria-label="Tutup menu" onClick={() => setOpen(false)} className="ml-auto flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg text-brand-200 hover:bg-white/10 lg:hidden"><Icon name="close" /></button>
-            </div>
-            <div className="mt-5 rounded-lg border border-white/10 bg-white/5 px-3 py-2.5">
-              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-gold-300">Akaun aktif</p>
-              <p className="mt-1 truncate text-sm font-semibold text-white">{session.name}</p>
-              <p className="mt-0.5 truncate text-xs text-brand-200">{roleLabel(session.roles)}</p>
-              <div className="mt-2 flex items-center gap-2 border-t border-white/10 pt-2">
-                <p className="min-w-0 flex-1 truncate font-mono text-[10px] text-brand-300" title={`ID pengguna: ${session.sub}`}>ID: {session.sub}</p>
-                <button type="button" aria-label="Salin ID pengguna" onClick={() => { void navigator.clipboard.writeText(session.sub); }} className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-brand-300 hover:bg-white/10 hover:text-white"><Icon name="copy" size={13} /></button>
+<div className="border-b border-white/10 px-5 py-5">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-gold-300/40 bg-brand-700 text-gold-200"><Icon name="shield" size={23} /></div>
+                <div className="min-w-0">
+                  <p className="font-display text-xl font-semibold leading-none text-white">SPSM</p>
+                  <p className="mt-1 truncate text-[10px] font-bold uppercase tracking-[0.14em] text-brand-200">MITS Selangor</p>
+                </div>
+                <button type="button" aria-label="Tutup menu" onClick={() => setOpen(false)} className="ml-auto flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg text-brand-200 hover:bg-white/10 lg:hidden"><Icon name="close" /></button>
               </div>
             </div>
-          </div>
           <nav aria-label="Navigasi utama" className="flex-1 overflow-y-auto px-3 py-5">
             {groups.map((group) => <div key={group.label} className="mb-6 last:mb-0">
               <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-brand-300">{group.label}</p>
@@ -60,9 +51,16 @@ function StaffShell({ session, children }: { session: Session; children: React.R
               })}</div>
             </div>)}
           </nav>
-          <div className="border-t border-white/10 p-4">
-            <a href="/api/auth/logout" className="flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-semibold text-brand-200 transition-colors hover:bg-danger-800/30 hover:text-white"><Icon name="close" size={18} /> Log keluar</a>
-          </div>
+          <div className="border-t border-white/10 p-3">
+              <div className="flex items-center gap-2.5 rounded-lg px-1.5 py-1">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gold-300/40 bg-brand-700 text-gold-200"><Icon name="user" size={16} /></div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold leading-tight text-white" title={`ID pengguna: ${session.sub}`}>{session.name}</p>
+                  <p className="truncate text-xs text-brand-300">{roleLabel(session.roles)}</p>
+                </div>
+                <a href="/api/auth/logout" aria-label="Log keluar" title="Log keluar" className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-lg text-brand-200 transition-colors hover:bg-danger-800/30 hover:text-white"><Icon name="close" size={18} /></a>
+              </div>
+            </div>
         </div>
       </aside>
       {open ? <button type="button" aria-label="Tutup navigasi" onClick={() => setOpen(false)} className="fixed inset-0 z-40 cursor-pointer bg-brand-950/60 lg:hidden" /> : null}

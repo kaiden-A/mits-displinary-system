@@ -1,20 +1,24 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { buildLogoutUrl, SESSION_COOKIE } from "@/lib/auth-oidc";
-import { getSessionFromRequest } from "@/lib/auth";
+import { getSessionFromRequest, PW_COOKIE } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
   const session = await getSessionFromRequest(request);
-  const response = NextResponse.redirect(new URL("/login", request.nextUrl));
-  response.cookies.delete(SESSION_COOKIE);
-  response.cookies.delete("pw_session");
+  const idTokenHint = request.cookies.get("id_token_hint")?.value;
+
+  const clearCookies = (response: NextResponse) => {
+    response.cookies.delete(SESSION_COOKIE);
+    response.cookies.delete(PW_COOKIE);
+    response.cookies.delete("id_token_hint");
+    response.cookies.delete("oidc-state");
+    return response;
+  };
 
   if (session?.authType === "staff" && session.sub) {
-    const logoutUrl = await buildLogoutUrl(request.nextUrl.origin);
-    const logoutResponse = NextResponse.redirect(logoutUrl);
-    logoutResponse.cookies.delete(SESSION_COOKIE);
-    logoutResponse.cookies.delete("pw_session");
-    return logoutResponse;
+    const logoutUrl = await buildLogoutUrl(request.nextUrl.origin, idTokenHint || undefined);
+    return clearCookies(NextResponse.redirect(logoutUrl));
   }
-  return response;
+
+  return clearCookies(NextResponse.redirect(new URL("/login", request.nextUrl)));
 }

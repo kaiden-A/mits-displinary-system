@@ -1,6 +1,7 @@
 import httpx
 
 from ..config import settings
+from ..templating import render_template
 
 EMAIL_ENDPOINT = "/api/v1/emails/send-html"
 DEFAULT_FROM = "spsm@mits.edu.my"
@@ -35,25 +36,29 @@ def notify_case_created(case, origin: str) -> None:
         subject = f"SPSM: Aduan B01 baharu {case['id']}"
     elif origin == "PREFECT_WARNING":
         subject = f"SPSM: Kad Peringatan B03 menunggu semakan {case['id']}"
-    send_html(
-        "guru-disiplin@mits.edu.my",
-        subject,
-        f"<p>Kes <b>{case['id']}</b> ({case['status']}) bagi {case['student_name']} "
-        f"({case['points']} mata) telah diwujudkan.</p>",
+    html = render_template(
+        "emails/case_created.html",
+        case_id=case["id"],
+        status=case["status"],
+        student_name=case["student_name"],
+        points=case["points"],
     )
+    send_html("guru-disiplin@mits.edu.my", subject, html)
 
 
 def notify_b03_review(case, pengawas_email: str, approved: bool) -> None:
+    html = render_template("emails/b03_review.html", case_id=case["id"], approved=approved)
     send_html(
         pengawas_email,
         f"SPSM: Kad Peringatan {case['id']} {'disahkan' if approved else 'ditolak'}",
-        f"<p>Kad Peringatan <b>{case['id']}</b> telah {'disahkan dan direkod dalam B04' if approved else 'ditolak'}.</p>",
+        html,
     )
 
 
 def notify_parent_letter(case, level: str) -> None:
+    html = render_template("emails/parent_letter.html", case_id=case["id"], level=level)
     send_html(
         PARENT_PLACEHOLDER_EMAIL,
         f"SPSM: Surat Pemberitahuan / Amaran {level} - {case['id']}",
-        f"<p>Surat Pemberitahuan / Amaran {level} bagi kes {case['id']} telah dikeluarkan.</p>",
+        html,
     )

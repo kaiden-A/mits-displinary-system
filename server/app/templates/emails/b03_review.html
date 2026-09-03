@@ -1,0 +1,8 @@
+{% extends "emails/base.html" %}
+{% block content %}
+<p style="margin:0 0 16px;font-size:15px;">
+  Kad Peringatan <strong>{{ case_id }}</strong> telah
+  {% if approved %}disahkan dan direkod dalam B04{% else %}ditolak{% endif %}.
+</p>
+<p style="margin:0;font-size:13px;color:#586961;">Sila semak sistem untuk maklumat lanjut.</p>
+{% endblock %}

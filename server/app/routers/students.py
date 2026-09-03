@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from ..database import get_db
 from ..dependencies import get_current_principal, require_roles
@@ -81,6 +81,7 @@ def student_summary(
     recorded = list(
         db.scalars(
             select(Case)
+            .options(selectinload(Case.offences))
             .where(
                 Case.student_source_id == source_id,
                 Case.status.in_(cases_service.RECORDED_SET),

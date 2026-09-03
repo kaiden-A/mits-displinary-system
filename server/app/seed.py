@@ -202,14 +202,14 @@ def tier_for(points: int) -> dict:
 
 def required_forms(points: int) -> list[dict]:
     forms = []
-    if points >= 10:
+    if points >= 6:
         forms.append({"code": "B05", "name": "Borang Pengakuan Murid"})
         forms.append(
             {
                 "code": "B06",
-                "name": "Surat Amaran Terakhir" if points >= 40 else "Surat Pemberitahuan / Amaran",
+                "name": "Surat Pemberitahuan / Surat Amaran Terakhir" if points >= 31 else "Surat Pemberitahuan / Amaran",
             }
         )
-    if points >= 30:
-        forms.append({"code": "B08", "name": "Surat Akujanji (akhir)" if points >= 40 else "Surat Akujanji"})
+    if points >= 21:
+        forms.append({"code": "B08", "name": "Surat Akujanji" if points >= 31 else "Surat Perjanjian"})
     return forms

@@ -1,9 +1,23 @@
-import Link from "next/link";
 import { getSession } from "@/lib/session";
 import { apiFetch } from "@/lib/api";
-import { formatDate, formatDateTime, sourceLabel } from "@/lib/client-api";
-import type { CaseDetail } from "@/lib/types";
-import { Icon } from "@/components/ui";
+import { formatDateTime } from "@/lib/client-api";
+import type { CaseDetail, CaseSummary, StudentSummary } from "@/lib/types";
+import PrintToolbar from "@/components/PrintToolbar";
+import {
+  B01Doc,
+  B02Doc,
+  B03Doc,
+  B04Doc,
+  B05Doc,
+  B06Doc,
+  B07Doc,
+  B08Doc,
+  GenericDoc,
+  KadDoc,
+  printTitle,
+  PrintStyle,
+  type PrefectOffence,
+} from "@/components/print/print-docs";
 
 export const dynamic = "force-dynamic";
 
@@ -12,26 +26,81 @@ export default async function PrintDocumentPage({ params }: { params: Promise<{ 
   const session = await getSession();
   if (!session || session.authType !== "staff") return null;
   let data: CaseDetail;
-  try { data = await apiFetch<CaseDetail>(`/cases/${id}`, session.access_token); } catch { return <p className="p-8 text-sm">Dokumen tidak dapat dimuatkan.</p>; }
+  try {
+    data = await apiFetch<CaseDetail>(`/cases/${id}`, session.access_token);
+  } catch {
+    return <p className="p-8 text-sm">Dokumen tidak dapat dimuatkan.</p>;
+  }
+
+  let register: CaseSummary[] = [];
+  if (document === "b04") {
+    try {
+      register = await apiFetch<CaseSummary[]>("/cases/recorded", session.access_token);
+    } catch {
+      register = [data];
+    }
+  }
+
+  let studentCases: CaseSummary[] = [];
+  if (document === "kad") {
+    try {
+      const summary = await apiFetch<StudentSummary>(`/students/${data.student_source_id}/summary`, session.access_token);
+      studentCases = summary.cases;
+    } catch {
+      /* ignore */
+    }
+  }
+
+  let prefectCodes: PrefectOffence[] = [];
+  if (document === "b03") {
+    try {
+      prefectCodes = await apiFetch<PrefectOffence[]>("/offences/prefect-allowed", session.access_token);
+    } catch {
+      /* ignore */
+    }
+  }
+
   const title = printTitle(document);
-  return <main className="min-h-dvh bg-white text-black"><div className="no-print mx-auto flex max-w-3xl items-center justify-between gap-3 border-b border-gray-200 px-6 py-4"><Link href={`/kes/${id}?tab=documents`} className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-gray-700"><Icon name="arrowLeft" size={17} />Kembali ke kes</Link><button type="button" onClick={() => window.print()} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-black px-4 text-sm font-semibold text-white"><Icon name="printer" size={16} />Cetak</button></div><article className="print-page mx-auto max-w-3xl px-8 py-10 sm:px-14"><header className="border-b-2 border-black pb-5 text-center"><p className="font-serif text-lg font-bold">MAAHAD INTEGRASI TAHFIZ SELANGOR (MITS)</p><p className="mt-1 text-xs">Sistem Pembangunan Sahsiah Murid</p><p className="mt-5 text-sm font-bold">{title.code}</p><h1 className="mt-1 text-xl font-bold uppercase">{title.name}</h1></header><div className="mt-7">{renderDocument(document, data)}</div><footer className="mt-10 border-t border-black pt-3 text-[10px]">Dokumen dijana daripada SPSM · Kes K-{String(data.seq).padStart(4, "0")} · Dicetak {formatDateTime(new Date())}</footer></article></main>;
+  return (
+    <main className="min-h-dvh bg-white text-black">
+      <PrintStyle />
+      <PrintToolbar backHref={`/kes/${id}?tab=documents`} />
+      <article className="print-page mx-auto max-w-3xl px-8 py-10 sm:px-14">
+        {renderDocument(document, data, { register, studentCases, prefectCodes })}
+        <footer className="mt-10 border-t border-black pt-3 text-[10px]">
+          Dokumen dijana daripada SPSM · Kes K-{String(data.seq).padStart(4, "0")} · {title.code} · Dicetak{" "}
+          {formatDateTime(new Date())}
+        </footer>
+      </article>
+    </main>
+  );
 }
 
-function renderDocument(document: string, data: CaseDetail) {
-  const doc = data.docs.find((item) => item.doc_code === document)?.data || (data as unknown as Record<string, Record<string, unknown> | null>)[document] || {};
-  const value = (key: string) => String(doc[key] ?? "");
-  const student = data.student_snapshot;
-  const lines = data.offences.map((item) => `${item.code} · ${item.name} (${item.points} mata)`).join("; ");
-  if (document === "b02") return <div className="space-y-5">{data.b02_forms.length ? data.b02_forms.map((form) => <section key={form.id} className="break-inside-avoid"><p className="mb-3 text-center text-xs">B02-{form.id} · Diisi oleh {form.fill_by} · {formatDate(form.filled_at)}</p><PrintTable rows={[["Aduan", String(form.fields.aduan || data.details)], ["Tarikh aduan", String(form.fields.tarikhAduan || "")], ["Butiran pengadu", String(form.fields.butiranPengadu || data.reporter_name)], ["Diterima oleh", String(form.fields.diterimaOleh || "")], ["Tarikh / masa", String(form.fields.tarikhMasa || "")], ["Nama murid", `${student.name} (${student.kelas_label})`], ["Isu", String(form.fields.isu || "")], ["Laporan siasatan", String(form.fields.laporan || "")], ["Punca masalah", String(form.fields.punca || "")], ["Penambahbaikan", String(form.fields.penambahbaikan || "")], ["Saksi", String(form.fields.saksi || "")], ["Bahan sokongan / bukti", String(form.fields.bukti || "")]]} /></section>) : <p>Belum ada B02.</p>}</div>;
-  if (document === "b03") return <PrintTable rows={[["Nama murid", student.name], ["Tingkatan / kelas", student.kelas_label], ["Tarikh / masa", `${value("tarikhKejadian")} ${value("masaKejadian")}`], ["Kod kesalahan", data.offences.map((item) => item.code).join(", ")], ["Tindakan", value("tindakan")], ["Nama pengawas", data.reporter_name], ["Tandatangan pengawas", ""], ["Tandatangan murid", ""]]} />;
-  if (document === "b04") return <PrintTable rows={[["Kes", `K-${data.seq}`], ["Tarikh", formatDate(data.created_at)], ["Nama murid", student.name], ["Tingkatan / kelas", student.kelas_label], ["Kesalahan", lines], ["Mata", String(data.points)], ["Catatan", ""]]} />;
-  if (document === "b05") return <PrintTable rows={[["Nama murid", student.name], ["Tingkatan / kelas", student.kelas_label], ["Kesalahan", lines], ["Pengakuan", value("perbuatan")], ["Tarikh", value("tarikhPengakuan")], ["Masa", value("masaPengakuan")], ["Tempat", value("tempat")], ["Saksi 1", value("saksi1")], ["Saksi 2", value("saksi2")], ["Tandatangan murid", ""]]} />;
-  if (document === "b06") return <><PrintTable rows={[["Kepada", "Ibu bapa / penjaga"], ["Tarikh surat", value("tarikhSurat")], ["Nama murid", student.name], ["Tingkatan / kelas", student.kelas_label], ["Peringkat amaran", value("warningLevel") || data.warning_level], ["Kesalahan", lines], ["Tarikh pertemuan", value("tarikhJumpa")], ["Masa pertemuan", value("masaJumpa")], ["Pihak berkuasa menandatangani", "Pentadbir"]]} /><p className="mt-8 leading-7">Dengan ini dimaklumkan bahawa murid tersebut telah melakukan kesalahan seperti yang dinyatakan dan tindakan akan diambil mengikut Modul SPSM.</p></>;
-  if (document === "b07") return <PrintTable rows={[["Barang yang dirampas", value("barang")], ["Nama murid", student.name], ["Tingkatan / kelas", student.kelas_label], ["Tarikh", value("tarikh")], ["Catatan serahan", value("catatan")], ["Tarikh serahan", value("tarikhSerahan")]]} />;
-  if (document === "b08") return <PrintTable rows={[["Nama murid", student.name], ["Tingkatan / kelas", student.kelas_label], ["Catatan", value("catatan")], ["Nama ibu bapa / penjaga", value("namaPenjaga")], ["Tandatangan murid", ""], ["Tandatangan ibu bapa / penjaga", ""], ["Tandatangan Pentadbir", ""]]} />;
-  if (document === "kad") return <PrintTable rows={[["Nama murid", student.name], ["Tingkatan / kelas", student.kelas_label], ["No. K/P", student.ic_number || ""], ["Sumber kes", sourceLabel(data.source)], ["Tarikh", formatDate(data.created_at)], ["Kesalahan", lines], ["Mata kes", String(data.points)], ["Rekod pertemuan", data.meeting ? String(data.meeting.catatan || "") : ""]]} />;
-  return <PrintTable rows={[["Nama murid", student.name], ["Tingkatan / kelas", student.kelas_label], ["Tarikh dan masa kejadian", `${value("tarikhKejadian")} ${value("masaKejadian")}`], ["Kesalahan", lines], ["Butiran aduan", value("aduan") || data.details], ["Lokasi", value("lokasi")], ["Cadangan", value("cadangan")], ["Nama pengadu", data.reporter_name], ["Alamat pengadu", value("alamatPengadu")], ["No. telefon", value("telefon")]]} />;
+function renderDocument(
+  document: string,
+  data: CaseDetail,
+  extra: { register: CaseSummary[]; studentCases: CaseSummary[]; prefectCodes: PrefectOffence[] }
+) {
+  switch (document) {
+    case "b01":
+      return <B01Doc c={data} />;
+    case "b02":
+      return <B02Doc c={data} />;
+    case "b03":
+      return <B03Doc c={data} codes={extra.prefectCodes} />;
+    case "b04":
+      return <B04Doc register={extra.register} />;
+    case "b05":
+      return <B05Doc c={data} />;
+    case "b06":
+      return <B06Doc c={data} />;
+    case "b07":
+      return <B07Doc c={data} />;
+    case "b08":
+      return <B08Doc c={data} />;
+    case "kad":
+      return <KadDoc c={data} cases={extra.studentCases} />;
+    default:
+      return <GenericDoc c={data} />;
+  }
 }
-
-function PrintTable({ rows }: { rows: string[][] }) { return <table className="w-full border-collapse text-sm"><tbody>{rows.map(([label, value]) => <tr key={label} className="break-inside-avoid border-b border-black"><th className="w-1/3 py-3 pr-5 text-left align-top font-bold">{label}</th><td className="whitespace-pre-wrap py-3 leading-6">{value || " "}</td></tr>)}</tbody></table>; }
-function printTitle(document: string) { const titles: Record<string, { code: string; name: string }> = { b01: { code: "B 01", name: "Borang Aduan Salah Laku Murid" }, b02: { code: "B 02", name: "Laporan Siasatan / Aduan" }, b03: { code: "B 03", name: "Kad Peringatan" }, b04: { code: "B 04", name: "Rekod Disiplin" }, b05: { code: "B 05", name: "Borang Pengakuan Murid" }, b06: { code: "B 06", name: "Surat Pemberitahuan / Amaran" }, b07: { code: "B 07", name: "Surat Barang Rampasan" }, b08: { code: "B 08", name: "Surat Akujanji" }, kad: { code: "LAM/DIS/002-1", name: "Kad SPSM" } }; return titles[document] || { code: document.toUpperCase(), name: "Dokumen SPSM" }; }

@@ -4,9 +4,14 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..config import settings
 from ..models import StudentCache
 
-STUDENT_API = "https://mits-student-server-1088310577603.asia-southeast1.run.app"
+DEFAULT_STUDENT_API = "https://mits-student-server-1088310577603.asia-southeast1.run.app"
+
+
+def student_api_base() -> str:
+    return (settings.student_data_api or DEFAULT_STUDENT_API).rstrip("/")
 
 
 def fetch_all_students() -> list[dict]:
@@ -16,7 +21,7 @@ def fetch_all_students() -> list[dict]:
     limit = 200
     with httpx.Client(timeout=30) as client:
         while True:
-            res = client.get(f"{STUDENT_API}/api/v1/students/", params={"limit": limit, "offset": offset})
+            res = client.get(f"{student_api_base()}/api/v1/students/", params={"limit": limit, "offset": offset})
             res.raise_for_status()
             payload = res.json()
             batch = payload.get("items", [])

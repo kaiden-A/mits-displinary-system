@@ -81,6 +81,11 @@ class CaseOut(BaseModel):
     meeting: dict | None
     created_at: datetime
     updated_at: datetime
+    offences: list[OffenceIn] = Field(default_factory=list)
+    tier: int = 0
+    tier_label: str = ""
+    counselling: list[dict[str, Any]] = Field(default_factory=list)
+    punishment: dict[str, Any] | None = None
 
 
 class CaseDetailOut(CaseOut):

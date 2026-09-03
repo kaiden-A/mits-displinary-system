@@ -63,9 +63,9 @@ export function visibleDocs(session: Session | null, caseData: { points: number;
     const needsB02 = caseData.source === "SPOT_CHECK" || (caseData.source === "COMPLAINT" && caseData.points > 5);
     if (needsB02) docs.splice(1, 0, "b02");
     if (caseData.source === "PREFECT_WARNING") docs.splice(1, 0, "b03");
-    if (caseData.points >= 10) {
+    if (caseData.points >= 6) {
       docs.push("b05", "b06");
-      if (caseData.points >= 30) docs.push("b08");
+      if (caseData.points >= 21) docs.push("b08");
     }
     return docs;
   }

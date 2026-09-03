@@ -1,0 +1,15 @@
+{% extends "emails/base.html" %}
+{% block content %}
+<p style="margin:0 0 16px;font-size:15px;">Kes baharu telah diwujudkan dalam sistem SPSM.</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#edf5ef;border:1px solid #b9d6c1;border-radius:8px;margin:0 0 16px;">
+  <tr>
+    <td style="padding:14px 18px;font-size:14px;line-height:1.7;">
+      <strong>Kes:</strong> {{ case_id }}<br />
+      <strong>Status:</strong> {{ status }}<br />
+      <strong>Murid:</strong> {{ student_name }}<br />
+      <strong>Mata:</strong> {{ points }}
+    </td>
+  </tr>
+</table>
+<p style="margin:0;font-size:13px;color:#586961;">Sila semak sistem untuk tindakan seterusnya.</p>
+{% endblock %}

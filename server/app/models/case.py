@@ -31,6 +31,8 @@ class Case(Base):
     details: Mapped[str] = mapped_column(Text, default="")
     warning_level: Mapped[str] = mapped_column(String(10), default="Pertama")
     meeting: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    counselling: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
+    punishment: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow

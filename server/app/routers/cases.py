@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from ..database import get_db
 from ..dependencies import get_current_principal
@@ -20,6 +20,7 @@ from ..schemas import (
 )
 from ..services import cases_service, workflow
 from ..services.students_service import mask_ic_number
+from ..seed import tier_for
 
 router = APIRouter(prefix="/cases", tags=["cases"])
 
@@ -62,6 +63,10 @@ def _to_detail(case, principal: Principal | None = None) -> CaseDetailOut:
         events=[CaseEventOut(ts=e.ts, text=e.text, by_name=e.by_name, by_role=e.by_role) for e in case.events],
         b02_forms=[B02Out(id=f.id, fill_by=f.fill_by, fill_role=f.fill_role, filled_at=f.filled_at, fields=f.fields) for f in case.b02_forms],
         docs=[CaseDocOut(doc_code=d.doc_code, data=d.data) for d in case.docs],
+        tier=tier_for(case.points)["tier"],
+        tier_label=tier_for(case.points)["label"],
+        counselling=case.counselling or [],
+        punishment=case.punishment,
         **structured,
     )
 
@@ -82,6 +87,11 @@ def _to_out(case, principal: Principal | None = None) -> CaseOut:
         meeting=case.meeting,
         created_at=case.created_at,
         updated_at=case.updated_at,
+        offences=[OffenceIn(code=o.code, name=o.name, points=o.points) for o in case.offences],
+        tier=tier_for(case.points)["tier"],
+        tier_label=tier_for(case.points)["label"],
+        counselling=case.counselling or [],
+        punishment=case.punishment,
     )
 
 
@@ -101,7 +111,7 @@ def list_cases(
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
 ):
-    stmt = cases_service.case_visible_query(principal)
+    stmt = cases_service.case_visible_query(principal).options(selectinload(cases_service.Case.offences))
     if q:
         like = f"%{q}%"
         snapshot = cases_service.Case.student_snapshot
@@ -164,6 +174,18 @@ def patch_doc(case_id: int, payload: DocPatch, db: Session = Depends(get_db), pr
 def patch_meeting(case_id: int, payload: MeetingPatch, db: Session = Depends(get_db), principal: Principal = Depends(get_current_principal)):
     case = cases_service.patch_meeting(db, case_id, payload.meeting, principal)
     return {"id": case.id, "meeting": case.meeting}
+
+
+@router.post("/{case_id}/counselling")
+def add_counselling(case_id: int, payload: MeetingPatch, db: Session = Depends(get_db), principal: Principal = Depends(get_current_principal)):
+    case = cases_service.add_counselling_session(db, case_id, payload.meeting, principal)
+    return {"id": case.id, "counselling": case.counselling or []}
+
+
+@router.patch("/{case_id}/punishment")
+def patch_punishment(case_id: int, payload: MeetingPatch, db: Session = Depends(get_db), principal: Principal = Depends(get_current_principal)):
+    case = cases_service.set_punishment(db, case_id, payload.meeting, principal)
+    return {"id": case.id, "punishment": case.punishment}
 
 
 @router.get("/{case_id}/steps")

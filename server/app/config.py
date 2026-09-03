@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     email_api: str = ""
     api_key: str = ""
 
+    student_data_api: str = ""
+
     app_secret: str = "dev-only-secret-change-me"
     pengawas_session_minutes: int = 15
     pengawas_max_failed: int = 5

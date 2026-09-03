@@ -30,7 +30,7 @@ export interface CaseSummary {
   source: string;
   status: string;
   student_source_id: number;
-  student_snapshot: { name: string; kelas_label: string; tingkatan?: number; kelas?: string; ic_number?: string };
+  student_snapshot: { name: string; kelas_label: string; tingkatan?: number; kelas?: string; ic_number?: string; gender?: string };
   reporter_name: string;
   reporter_role: string;
   points: number;
@@ -39,6 +39,11 @@ export interface CaseSummary {
   meeting?: Record<string, string> | null;
   created_at: string;
   updated_at: string;
+  offences?: Offence[];
+  tier?: number;
+  tier_label?: string;
+  counselling?: Record<string, string>[];
+  punishment?: Record<string, string> | null;
 }
 
 export interface CaseDetail extends CaseSummary {

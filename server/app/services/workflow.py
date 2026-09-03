@@ -103,7 +103,8 @@ def path_for(source: str, points: int) -> list[str]:
         path = ["REPORTED", "INVESTIGATING", "CONFIRMED", "RECORDED"]
     else:
         path = ["REPORTED", "RECORDED"]
-    path.extend(HEAVY_PATH if points >= 10 else LIGHT_PATH)
+    # Peringkat 2 (6+ mata): B05, B06, hubungi ibu bapa — full path. Peringkat 1: light.
+    path.extend(HEAVY_PATH if points >= 6 else LIGHT_PATH)
     return path
 
 
@@ -161,28 +162,36 @@ def next_steps(source: str, points: int, status: str, has_b02: bool) -> list[dic
     elif status == "CONFIRMED":
         add("Rekod kesalahan dalam Buku Rekod Disiplin (B04).", "Guru Disiplin", "record")
     elif status == "RECORDED":
-        if points >= 10:
-            add("Murid mengisi Borang Pengakuan Murid (B05) — wajib bagi 10 mata dan ke atas.", "Guru Disiplin", "ack")
+        if points >= 6:
+            add("Murid mengisi Borang Pengakuan Murid (B05) — wajib bagi 6 mata dan ke atas.", "Guru Disiplin", "ack")
         else:
             add("Laksanakan tindakan mengikut Modul SPSM: amaran bertulis + tarbiah / khidmat sosial.", "Badan Disiplin", "execute")
+        if 11 <= points <= 40:
+            add("Murid menghadiri sesi kaunseling — rekod setiap sesi dalam dokumen kes (wajib sebelum tutup kes).", "Guru Disiplin")
     elif status == "STUDENT_ACK":
         add("Isi Kad SPSM (LAM/DIS/002-1).", "Guru Disiplin")
         add("Sediakan Surat Pemberitahuan / Amaran (B06) dan Surat Akujanji (B08) jika berkaitan.", "Guru Disiplin", "prepare")
     elif status == "ACTION_PREPARED":
+        if 31 <= points <= 40:
+            add("Rekod hukuman Peringkat 5 (gantung asrama / gantung sekolah / rotan) dalam dokumen kes.", "Guru Disiplin")
         add("Hantar surat untuk tandatangan Pentadbir.", "Guru Disiplin", "approve")
     elif status == "PRINCIPAL_APPROVAL":
         add("Tandatangani Surat Pemberitahuan / Amaran (B06) kepada ibu bapa / penjaga.", "Pentadbir", "sign")
     elif status == "EXECUTED":
-        if points >= 10:
+        if points >= 6:
             add("Hantar surat secara serahan tangan / pos (makluman melalui telefon jika perlu tindakan segera).", "Guru Disiplin", "notify")
         else:
             add("Kes ringan selesai — tamatkan kes.", "Guru Disiplin", "close")
     elif status == "PARENT_NOTIFIED":
         add("Ibu bapa / penjaga dipanggil?", "Guru Disiplin")
         add("Ya — buat pertemuan dengan ibu bapa / penjaga.", "Guru Disiplin", "meeting")
+        if points >= 41:
+            add("Peringkat 6: murid dinasihatkan berpindah sekolah.", "Guru Disiplin")
         add("Tidak — tamatkan kes.", "Guru Disiplin", "close")
     elif status == "MEETING":
         add("Tandatangan Surat Akujanji (B08) jika berkaitan semasa pertemuan.", "Guru Disiplin")
+        if points >= 41:
+            add("Peringkat 6: murid dinasihatkan berpindah sekolah.", "Guru Disiplin")
         add("Rekod butiran / hasil pertemuan dalam Kad SPSM (LAM/DIS/002-1) dan tutup kes.", "Guru Disiplin", "close")
     else:
         add("Kes telah tamat.")

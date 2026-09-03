@@ -1,6 +1,8 @@
+from datetime import datetime
+
 from fastapi import HTTPException
 from sqlalchemy import false, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from ..models import B02Form, Case, CaseDoc, CaseEvent, CaseOffence, Notification
 from ..schemas import CaseCreate, Principal
@@ -213,16 +215,84 @@ def advance(db: Session, case_id: int, action: str, principal: Principal) -> Cas
     except KeyError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
+    if action == "close" and 11 <= case.points <= 40 and not (case.counselling or []):
+        raise HTTPException(
+            status_code=422,
+            detail="Rekod sesi kaunseling belum diisi sebelum kes ditutup (wajib untuk Peringkat 3-5).",
+        )
+
+    text = transition["text"]
+    if action == "close" and case.points >= 41:
+        text = f"{text} Murid dinasihatkan berpindah sekolah (Peringkat 6)."
+
     case.status = transition["to"]
     actor_role = principal_role(principal)
-    case.events.append(CaseEvent(text=transition["text"], by_name=principal.name, by_role=actor_role))
+    case.events.append(CaseEvent(text=text, by_name=principal.name, by_role=actor_role))
     _add_notifications(
         db,
         case,
         "CASE_TRANSITION",
-        f"Kes K-{case.seq}: {transition['text']}",
+        f"Kes K-{case.seq}: {text}",
         roles=("guru_disiplin", "pentadbir", "super_admin"),
         notify_reporter=True,
+    )
+    db.commit()
+    db.refresh(case)
+    return case
+
+
+def add_counselling_session(db: Session, case_id: int, session_fields: dict, principal: Principal) -> Case:
+    """Append one counselling session record. Mandatory for tiers 3-5 (11-40 mata)."""
+    case = db.get(Case, case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail="case not found")
+    if not can_view_case(case, principal):
+        raise HTTPException(status_code=403, detail="not your case")
+    if not is_manager(principal):
+        raise HTTPException(status_code=403, detail="role may not record counselling sessions")
+    if case.points < 11:
+        raise HTTPException(status_code=422, detail="counselling is only required from Peringkat 3 (11 mata)")
+
+    session_fields = dict(session_fields)
+    session_fields["recorded_by"] = principal.name
+    session_fields["recorded_at"] = datetime.utcnow().isoformat()
+    sessions = list(case.counselling or [])
+    sessions.append(session_fields)
+    case.counselling = sessions
+    case.events.append(
+        CaseEvent(
+            text=f"Sesi kaunseling direkod oleh {principal.name}.",
+            by_name=principal.name,
+            by_role=principal_role(principal),
+        )
+    )
+    db.commit()
+    db.refresh(case)
+    return case
+
+
+def set_punishment(db: Session, case_id: int, punishment: dict, principal: Principal) -> Case:
+    """Record the tier-5 punishment (gantung asrama / gantung sekolah / rotan)."""
+    case = db.get(Case, case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail="case not found")
+    if not can_view_case(case, principal):
+        raise HTTPException(status_code=403, detail="not your case")
+    if not is_manager(principal):
+        raise HTTPException(status_code=403, detail="role may not record punishment")
+    if not 31 <= case.points <= 40:
+        raise HTTPException(status_code=422, detail="punishment record is only for Peringkat 5 (31-40 mata)")
+
+    punishment = dict(punishment)
+    punishment["recorded_by"] = principal.name
+    punishment["recorded_at"] = datetime.utcnow().isoformat()
+    case.punishment = punishment
+    case.events.append(
+        CaseEvent(
+            text=f"Hukuman Peringkat 5 direkod oleh {principal.name}: {punishment.get('jenis', '')}.",
+            by_name=principal.name,
+            by_role=principal_role(principal),
+        )
     )
     db.commit()
     db.refresh(case)
@@ -292,6 +362,7 @@ def recorded_cases(db: Session) -> list[Case]:
     return list(
         db.scalars(
             select(Case)
+            .options(selectinload(Case.offences))
             .where(Case.status.in_(RECORDED_SET), Case.status != "DISMISSED")
             .order_by(Case.created_at)
         )

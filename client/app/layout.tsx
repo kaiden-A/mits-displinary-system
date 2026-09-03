@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { getSession } from "@/lib/session";
-import Sidebar from "@/components/Sidebar";
+import AppShell from "@/components/AppShell";
 
 export const metadata: Metadata = {
   title: "SPSM · MITS — Sistem Pembangunan Sahsiah Murid",
@@ -9,21 +9,15 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
-  const showSidebar = !!session;
 
   return (
     <html lang="ms">
       <head>
-        <link
-          rel="stylesheet"
-          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
-        />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
       <body>
-        {showSidebar && session ? (
-          <Sidebar name={session.name} roles={session.roles} authType={session.authType} />
-        ) : null}
-        <main className={showSidebar ? "ml-64 max-w-6xl p-6 min-h-screen" : "min-h-screen"}>{children}</main>
+        {session ? <AppShell session={session}>{children}</AppShell> : <main id="main-content" className="min-h-dvh">{children}</main>}
       </body>
     </html>
   );

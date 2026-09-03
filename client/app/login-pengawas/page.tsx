@@ -2,90 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Alert, Button, Icon } from "@/components/ui";
 
 export default function PengawasLoginPage() {
-  const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError("");
-    try {
-      const res = await fetch("/api/auth/pengawas-login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setError(
-          res.status === 423
-            ? "Akaun dikunci. Sila jumpa pentadbir."
-            : data.detail || "Email atau kata laluan salah."
-        );
-        return;
-      }
-      router.push("/kad");
-      router.refresh();
-    } catch {
-      setError("Server tidak dapat dihubungi.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-100">
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8 w-full max-w-md">
-        <div className="w-14 h-14 rounded-2xl bg-amber-500 mx-auto flex items-center justify-center text-white mb-4">
-          <i className="fa-solid fa-triangle-exclamation text-xl" />
-        </div>
-        <h1 className="text-xl font-bold text-slate-800 text-center">Log Masuk Pengawas</h1>
-        <p className="text-sm text-slate-500 text-center mt-1">
-          Kiosk komputer awam · sesi tamat selepas 15 minit
-        </p>
-
-        {error ? (
-          <p className="mt-4 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>
-        ) : null}
-
-        <form onSubmit={submit} className="mt-6 space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">Email</label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">Kata Laluan</label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={busy}
-            className="w-full px-4 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white text-sm font-semibold rounded-lg"
-          >
-            {busy ? "Menghantar…" : "Log Masuk"}
-          </button>
-          <p className="text-[11px] text-slate-400 text-center">
-            Akaun pengawas diurus oleh pentadbir. Sesi dilog keluar automatik selepas 15 minit.
-          </p>
-        </form>
-      </div>
-    </div>
-  );
+  const router = useRouter(); const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [error, setError] = useState(""); const [busy, setBusy] = useState(false); const [showPassword, setShowPassword] = useState(false);
+  async function submit(event: React.FormEvent) { event.preventDefault(); setBusy(true); setError(""); try { const response = await fetch("/api/auth/pengawas-login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password }) }); if (!response.ok) { const body = await response.json().catch(() => ({})); setError(response.status === 423 ? "Akaun sedang dikunci. Sila hubungi pentadbir." : body.detail || "Email atau kata laluan salah."); return; } router.push("/kad"); router.refresh(); } catch { setError("Pelayan tidak dapat dihubungi. Semak sambungan dan cuba lagi."); } finally { setBusy(false); } }
+  return <div className="flex min-h-dvh items-center justify-center bg-brand-950 px-4 py-8"><div className="w-full max-w-md"><div className="mb-6 text-center text-white"><div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-gold-300/40 bg-brand-700 text-gold-100"><Icon name="shield" size={26} /></div><h1 className="mt-4 font-display text-3xl font-semibold">Ruang pengawas</h1><p className="mt-1 text-sm text-brand-200">Kad Peringatan · sesi kiosk 15 minit</p></div><div className="rounded-2xl border border-white/10 bg-surface p-6 shadow-xl sm:p-8"><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-gold-700">Log masuk B03</p><h2 className="mt-2 font-display text-2xl font-semibold text-brand-950">Masukkan akaun kiosk</h2><p className="mt-2 text-sm leading-6 text-ink-600">Selepas laporan dihantar, sejarah laporan tidak dipaparkan dalam ruang pengawas.</p>{error ? <Alert tone="danger" className="mt-5">{error}</Alert> : null}<form onSubmit={submit} className="mt-6 space-y-4"><label className="block"><span className="mb-1.5 block text-sm font-semibold text-ink-800">Email</span><input type="email" required value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="username" spellCheck={false} className="h-12 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200" /></label><label className="block"><span className="mb-1.5 block text-sm font-semibold text-ink-800">Kata laluan</span><span className="relative block"><input type={showPassword ? "text" : "password"} required value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" className="h-12 w-full rounded-lg border border-ink-200 bg-white px-3 pr-12 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200" /><button type="button" aria-label={showPassword ? "Sembunyikan kata laluan" : "Tunjukkan kata laluan"} onClick={() => setShowPassword((value) => !value)} className="absolute right-1 top-1 flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg text-ink-500 hover:bg-ink-50"><Icon name={showPassword ? "close" : "eye"} size={17} /></button></span></label><Button type="submit" variant="gold" className="w-full" disabled={busy}>{busy ? "Mengesahkan…" : "Log masuk"}<Icon name="chevronRight" size={16} /></Button></form><Link href="/login" className="mt-5 flex min-h-10 items-center justify-center text-xs font-semibold text-ink-500 hover:text-brand-700">Kembali ke log masuk staf</Link></div></div></div>;
 }

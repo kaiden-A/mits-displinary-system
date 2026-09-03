@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     zitadel_issuer: str = ""
     zitadel_jwks_uri: str = ""
     zitadel_audience: str = ""
+    zitadel_allowed_org_id: str = ""
     zitadel_required_role: str = ""
 
     email_api: str = ""

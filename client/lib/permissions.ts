@@ -2,13 +2,17 @@ import { ROLES, type Session } from "@/lib/auth";
 
 const MANAGER_ROLES = [ROLES.guruDisiplin, ROLES.pentadbir, ROLES.superAdmin];
 
-export function hasAny(session: Session | null, roles: string[]): boolean {
+export function hasAny(session: Pick<Session, "roles"> | null, roles: string[]): boolean {
   if (!session) return false;
   return session.roles.some((r) => roles.includes(r));
 }
 
 export function isManager(session: Session | null): boolean {
   return hasAny(session, MANAGER_ROLES);
+}
+
+export function isAdministrator(session: Session | null): boolean {
+  return hasAny(session, [ROLES.pentadbir, ROLES.superAdmin]);
 }
 
 /** Port of sample canAct — who may perform a workflow action. */
@@ -29,7 +33,7 @@ const ACTION_ROLES: Record<string, string[]> = {
   close: MANAGER_ROLES,
 };
 
-export function canAct(session: Session | null, action: string): boolean {
+export function canAct(session: Pick<Session, "roles"> | null, action: string): boolean {
   const roles = ACTION_ROLES[action];
   return roles ? hasAny(session, roles) : false;
 }
@@ -40,12 +44,12 @@ export function canAccessRoute(session: Session | null, pathname: string): boole
   const view = pathname.split("/")[1] || "dashboard";
 
   if (session.authType === "pengawas") return view === "kad";
-  if (view === "kad") return hasAny(session, [ROLES.pengawas, ROLES.superAdmin]);
+  if (view === "kad") return hasAny(session, [ROLES.superAdmin]);
   if (view === "aduan") return hasAny(session, [ROLES.guruBiasa, ROLES.guruDisiplin, ROLES.pentadbir, ROLES.superAdmin]);
-  if (view === "pengawas-accounts") return hasAny(session, [ROLES.pentadbir, ROLES.superAdmin]);
-  if (view === "dashboard" || view === "kes" || view === "murid" || view === "katalog") {
-    return session.authType === "staff";
-  }
+  if (view === "spot-check" || view === "murid" || view === "rekod-b04") return isManager(session);
+  if (view === "pengawas-accounts") return isAdministrator(session);
+  if (view === "dashboard") return isManager(session);
+  if (view === "kes" || view === "katalog" || view === "notifikasi") return session.authType === "staff";
   if (view === "login" || view === "login-pengawas") return false;
   return true;
 }

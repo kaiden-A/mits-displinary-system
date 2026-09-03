@@ -47,6 +47,11 @@ export async function GET(request: NextRequest) {
 
   const expiresIn = Math.max(tokens.expires_in || 12 * 60 * 60, 60);
   const roles = extractRoles(claims as Record<string, unknown>);
+  const spsmRoles = ["guru_biasa", "guru_disiplin", "pentadbir", "super_admin"];
+  const allowedRoles = roles.filter((role) => spsmRoles.includes(role));
+  if (!allowedRoles.length) {
+    return NextResponse.redirect(new URL("/login?error=forbidden_role", request.nextUrl));
+  }
 
   const sessionToken = await createSessionToken({
     sub: (claims.sub as string) || "",
@@ -54,7 +59,7 @@ export async function GET(request: NextRequest) {
     email: (claims.email as string) || "",
     access_token: tokens.access_token,
     expires_at: Math.floor(Date.now() / 1000) + expiresIn,
-    roles,
+    roles: allowedRoles,
   });
 
   const response = NextResponse.redirect(new URL("/dashboard", request.nextUrl));

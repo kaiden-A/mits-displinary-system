@@ -1,17 +1,71 @@
 from fastapi import HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import false, func, select
 from sqlalchemy.orm import Session
 
-from ..models import B02Form, Case, CaseDoc, CaseEvent, CaseOffence
+from ..models import B02Form, Case, CaseDoc, CaseEvent, CaseOffence, Notification
 from ..schemas import CaseCreate, Principal
 from ..seed import prefect_allowed
 from . import email_service, workflow
 from .students_service import get_student
 
+MANAGER_ROLES = {"guru_disiplin", "pentadbir", "super_admin"}
+CASE_DOCUMENT_CODES = ("b01", "b03", "b05", "b06", "b07", "b08")
 RECORDED_SET = {
     "RECORDED", "STUDENT_ACK", "ACTION_PREPARED", "PRINCIPAL_APPROVAL",
     "EXECUTED", "PARENT_NOTIFIED", "MEETING", "CLOSED",
 }
+
+
+def is_manager(principal: Principal) -> bool:
+    return bool(set(principal.roles).intersection(MANAGER_ROLES))
+
+
+def principal_role(principal: Principal, source: str | None = None) -> str:
+    """Return a stable role instead of relying on token role ordering."""
+    preferred = {
+        "PREFECT_WARNING": ("super_admin", "pengawas"),
+        "COMPLAINT": ("super_admin", "pentadbir", "guru_disiplin", "guru_biasa"),
+        "SPOT_CHECK": ("super_admin", "pentadbir", "guru_disiplin"),
+    }.get(source, ("super_admin", "pentadbir", "guru_disiplin", "guru_biasa", "pengawas"))
+    roles = set(principal.roles)
+    return next((role for role in preferred if role in roles), "unknown")
+
+
+def _document_payloads(payload: CaseCreate) -> dict:
+    """Accept both the legacy docs map and named structured document fields."""
+    documents = dict(payload.docs or {})
+    for code in CASE_DOCUMENT_CODES:
+        data = getattr(payload, code, None)
+        if data is not None:
+            documents[code] = data
+    return documents
+
+
+def _add_notifications(
+    db: Session,
+    case: Case,
+    ntype: str,
+    text: str,
+    *,
+    roles: tuple[str, ...] = (),
+    notify_reporter: bool = False,
+) -> None:
+    recipients: set[tuple[str | None, str | None]] = set()
+    if notify_reporter and case.reporter_sub:
+        recipients.add((case.reporter_sub, None))
+    recipients.update((None, role) for role in roles)
+    db.add_all(
+        [
+            Notification(
+                recipient_sub=recipient_sub,
+                recipient_role=recipient_role,
+                ntype=ntype,
+                case_id=case.id,
+                text=text,
+            )
+            for recipient_sub, recipient_role in recipients
+        ]
+    )
 
 
 def next_seq(db: Session) -> int:
@@ -67,6 +121,7 @@ def create_case(db: Session, payload: CaseCreate, principal: Principal) -> Case:
         status = "REPORTED"
 
     reporter_name = payload.reporter_name_override or principal.name
+    reporter_role = principal_role(principal, payload.source)
     case = Case(
         seq=next_seq(db),
         source=payload.source,
@@ -75,12 +130,12 @@ def create_case(db: Session, payload: CaseCreate, principal: Principal) -> Case:
         student_snapshot=snapshot_student(student),
         reporter_sub=principal.sub,
         reporter_name=reporter_name,
-        reporter_role=principal.roles[0] if principal.roles else "unknown",
+        reporter_role=reporter_role,
         points=points,
         details=payload.details,
     )
     case.offences = [CaseOffence(code=o.code, name=o.name, points=o.points) for o in payload.offences]
-    for doc_code, data in (payload.docs or {}).items():
+    for doc_code, data in _document_payloads(payload).items():
         case.docs.append(CaseDoc(doc_code=doc_code, data=data))
 
     first_event = {
@@ -95,6 +150,14 @@ def create_case(db: Session, payload: CaseCreate, principal: Principal) -> Case:
     case.events.append(CaseEvent(text=first_event, by_name=reporter_name, by_role=case.reporter_role))
 
     db.add(case)
+    db.flush()
+    _add_notifications(
+        db,
+        case,
+        "CASE_CREATED",
+        f"Kes baharu K-{case.seq} telah diwujudkan ({case.status}).",
+        roles=("guru_disiplin", "pentadbir", "super_admin"),
+    )
     db.commit()
     db.refresh(case)
 
@@ -114,15 +177,23 @@ def add_b02(db: Session, case_id: int, fields: dict, principal: Principal) -> B0
     case = db.get(Case, case_id)
     if not case:
         raise HTTPException(status_code=404, detail="case not found")
+    if not can_view_case(case, principal):
+        raise HTTPException(status_code=403, detail="not your case")
     if not workflow.needs_b02(case.source, case.points):
         raise HTTPException(status_code=422, detail="case does not require B02")
+    if case.status not in {"REPORTED", "INVESTIGATING"}:
+        raise HTTPException(status_code=422, detail="B02 may only be added while case is reported or investigating")
     if not set(principal.roles).intersection({"guru_biasa", "guru_disiplin", "pentadbir", "super_admin"}):
         raise HTTPException(status_code=403, detail="role may not fill B02")
 
-    form = B02Form(fill_by=principal.name, fill_role=principal.roles[0] if principal.roles else "", fields=fields)
+    form = B02Form(fill_by=principal.name, fill_role=principal_role(principal), fields=fields)
     case.b02_forms.append(form)
     case.events.append(
-        CaseEvent(text=f"Borang Siasatan (B02) diisi oleh {principal.name} ({case.reporter_role}).", by_name=principal.name)
+        CaseEvent(
+            text=f"Borang Siasatan (B02) diisi oleh {principal.name} ({form.fill_role}).",
+            by_name=principal.name,
+            by_role=form.fill_role,
+        )
     )
     db.commit()
     db.refresh(form)
@@ -143,7 +214,16 @@ def advance(db: Session, case_id: int, action: str, principal: Principal) -> Cas
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     case.status = transition["to"]
-    case.events.append(CaseEvent(text=transition["text"], by_name=principal.name, by_role=principal.roles[0] if principal.roles else ""))
+    actor_role = principal_role(principal)
+    case.events.append(CaseEvent(text=transition["text"], by_name=principal.name, by_role=actor_role))
+    _add_notifications(
+        db,
+        case,
+        "CASE_TRANSITION",
+        f"Kes K-{case.seq}: {transition['text']}",
+        roles=("guru_disiplin", "pentadbir", "super_admin"),
+        notify_reporter=True,
+    )
     db.commit()
     db.refresh(case)
     return case
@@ -153,6 +233,8 @@ def patch_doc(db: Session, case_id: int, doc_code: str, data: dict, principal: P
     case = db.get(Case, case_id)
     if not case:
         raise HTTPException(status_code=404, detail="case not found")
+    if not can_view_case(case, principal):
+        raise HTTPException(status_code=403, detail="not your case")
     if not set(principal.roles).intersection({"guru_disiplin", "pentadbir", "super_admin"}):
         raise HTTPException(status_code=403, detail="role may not edit case documents")
     doc = next((d for d in case.docs if d.doc_code == doc_code), None)
@@ -166,8 +248,29 @@ def patch_doc(db: Session, case_id: int, doc_code: str, data: dict, principal: P
     return doc
 
 
+def patch_meeting(db: Session, case_id: int, meeting: dict, principal: Principal) -> Case:
+    case = db.get(Case, case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail="case not found")
+    if not can_view_case(case, principal):
+        raise HTTPException(status_code=403, detail="not your case")
+    if not is_manager(principal):
+        raise HTTPException(status_code=403, detail="role may not edit meeting records")
+    case.meeting = meeting
+    case.events.append(
+        CaseEvent(
+            text=f"Rekod pertemuan ibu bapa dikemas kini oleh {principal.name}.",
+            by_name=principal.name,
+            by_role=principal_role(principal),
+        )
+    )
+    db.commit()
+    db.refresh(case)
+    return case
+
+
 def can_view_case(case: Case, principal: Principal) -> bool:
-    if set(principal.roles).intersection({"guru_disiplin", "pentadbir", "super_admin"}):
+    if is_manager(principal):
         return True
     if "guru_biasa" in principal.roles:
         return case.reporter_sub == principal.sub
@@ -178,13 +281,21 @@ def case_visible_query(principal: Principal):
     """Filter for list queries: own cases for guru_biasa, all for managers."""
     from ..models import Case as CaseModel
 
-    if set(principal.roles).intersection({"guru_disiplin", "pentadbir", "super_admin"}):
+    if is_manager(principal):
         return select(CaseModel)
-    return select(CaseModel).where(CaseModel.reporter_sub == principal.sub)
+    if "guru_biasa" in principal.roles:
+        return select(CaseModel).where(CaseModel.reporter_sub == principal.sub)
+    return select(CaseModel).where(false())
 
 
 def recorded_cases(db: Session) -> list[Case]:
-    return list(db.scalars(select(Case).where(Case.status.in_(RECORDED_SET)).order_by(Case.created_at)))
+    return list(
+        db.scalars(
+            select(Case)
+            .where(Case.status.in_(RECORDED_SET), Case.status != "DISMISSED")
+            .order_by(Case.created_at)
+        )
+    )
 
 
 def case_id_label(case: Case) -> str:

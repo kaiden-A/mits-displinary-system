@@ -95,7 +95,7 @@ class CaseDoc(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     case_id: Mapped[int] = mapped_column(ForeignKey("cases.id", ondelete="CASCADE"), index=True)
     doc_code: Mapped[str] = mapped_column(String(10))  # b01 | b03 | b05 | b06 | b07 | b08
-    data: Mapped[dict] = mapped_column(JSON, default=dict)
+    data: Mapped[dict | None] = mapped_column(JSON, default=dict, nullable=True)
 
     case: Mapped[Case] = relationship(back_populates="docs")
 

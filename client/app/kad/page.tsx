@@ -1,262 +1,39 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { clientApi } from "@/lib/client-api";
 import type { Student } from "@/lib/types";
-
-interface OffenceOption {
-  code: string;
-  name: string;
-  min_points: number;
-  max_points: number;
-}
+import StudentPicker from "@/components/StudentPicker";
+import OffencePicker, { type OffenceChoice } from "@/components/OffencePicker";
+import { Alert, Button, Card, Icon, PageHeader, PointsBadge } from "@/components/ui";
 
 const MAX_POINTS = 5;
-const SESSION_MINUTES = 15;
 
 export default function KadPage() {
-  const [students, setStudents] = useState<Student[]>([]);
-  const [offences, setOffences] = useState<OffenceOption[]>([]);
-  const [tingkatan, setTingkatan] = useState("");
-  const [kelas, setKelas] = useState("");
-  const [studentId, setStudentId] = useState("");
-  const [selected, setSelected] = useState<OffenceOption[]>([]);
-  const [reporterName, setReporterName] = useState("");
+  const [step, setStep] = useState(0);
+  const [student, setStudent] = useState<Student | null>(null);
+  const [offences, setOffences] = useState<OffenceChoice[]>([]);
+  const [reporter, setReporter] = useState("");
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
   const [details, setDetails] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [secondsLeft, setSecondsLeft] = useState(SESSION_MINUTES * 60);
+  const [submitted, setSubmitted] = useState(false);
+  const total = offences.reduce((sum, offence) => sum + offence.max_points, 0);
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setSecondsLeft((s) => {
-        if (s <= 1) {
-          clearInterval(timer);
-          window.location.href = "/api/auth/pengawas-logout";
-          return 0;
-        }
-        return s - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    clientApi<Student[]>("/students?limit=200").then(setStudents).catch(() => setStudents([]));
-    clientApi<OffenceOption[]>("/offences/prefect-allowed").then(setOffences).catch(() => setOffences([]));
-  }, []);
-
-  const tingkatanList = [...new Set(students.map((s) => s.tingkatan))].sort();
-  const kelasList = [...new Set(students.filter((s) => s.tingkatan === Number(tingkatan)).map((s) => s.kelas))].sort();
-  const studentList = students
-    .filter((s) => s.tingkatan === Number(tingkatan) && s.kelas === kelas)
-    .sort((a, b) => a.name.localeCompare(b.name));
-  const catKeys = [...new Set(offences.map((o) => o.code[0]))];
-  const total = selected.reduce((sum, o) => sum + o.max_points, 0);
-
-  function addOffence(code: string) {
-    const off = offences.find((o) => o.code === code);
-    if (!off || selected.some((s) => s.code === code)) return;
-    if (total + off.max_points > MAX_POINTS) {
-      setError(`Kad Peringatan tidak boleh melebihi ${MAX_POINTS} mata.`);
-      return;
-    }
+  function next() {
     setError("");
-    setSelected((prev) => [...prev, off]);
+    if (step === 0 && !student) return setError("Pilih seorang murid untuk meneruskan.");
+    if (step === 1 && (!date || !reporter.trim() || !offences.length || !details.trim())) return setError("Lengkapkan tarikh, nama pengawas, kesalahan, dan butiran kejadian.");
+    setStep((value) => Math.min(2, value + 1));
   }
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError("");
-    try {
-      await clientApi("/cases", {
-        method: "POST",
-        body: JSON.stringify({
-          source: "PREFECT_WARNING",
-          student_source_id: Number(studentId),
-          offences: selected.map((s) => ({ code: s.code, name: s.name, points: s.max_points })),
-          details,
-          reporter_name_override: reporterName,
-        }),
-      });
-      setSelected([]);
-      setStudentId("");
-      setReporterName("");
-      setDetails("");
-      alert("Kad Peringatan dihantar — menunggu semakan Guru Disiplin.");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
+  async function submit() {
+    if (!student) return;
+    setBusy(true); setError("");
+    try { await clientApi("/cases", { method: "POST", body: JSON.stringify({ source: "PREFECT_WARNING", student_source_id: student.id, offences: offences.map((item) => ({ code: item.code, name: item.name, points: item.max_points })), details, reporter_name_override: reporter, docs: { b03: { tarikhKejadian: date, masaKejadian: time, tindakan: offences.map((item) => item.action).filter(Boolean).join(", ") } } }) }); setSubmitted(true); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : "Kad peringatan tidak berjaya dihantar."); } finally { setBusy(false); }
   }
-
-  const mm = String(Math.floor(secondsLeft / 60)).padStart(2, "0");
-  const ss = String(secondsLeft % 60).padStart(2, "0");
-
-  return (
-    <div className="max-w-3xl">
-      <div className="flex items-center justify-between mb-4 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
-        <div className="text-sm text-amber-800 font-semibold">
-          <i className="fa-solid fa-clock mr-1.5" />
-          Sesi tamat automatik selepas 15 minit
-        </div>
-        <div className="font-mono font-bold text-amber-800">
-          {mm}:{ss}
-        </div>
-      </div>
-
-      <h1 className="text-xl font-bold text-slate-800">Kad Peringatan (B03)</h1>
-      <p className="text-sm text-slate-500 mb-4">
-        Lapor kesalahan ringan (maksimum {MAX_POINTS} mata). Isikan nama pengawas yang membuat laporan — laporan boleh
-        dimasukkan bagi pihak pengawas lain.
-      </p>
-
-      {error ? <p className="mb-4 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p> : null}
-
-      <form onSubmit={submit} className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4">
-        <div className="grid md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">Tingkatan *</label>
-            <select
-              value={tingkatan}
-              onChange={(e) => {
-                setTingkatan(e.target.value);
-                setKelas("");
-                setStudentId("");
-              }}
-              required
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-            >
-              <option value="">— Pilih Tingkatan —</option>
-              {tingkatanList.map((t) => (
-                <option key={t} value={t}>
-                  Tingkatan {t}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">Kelas *</label>
-            <select
-              value={kelas}
-              onChange={(e) => {
-                setKelas(e.target.value);
-                setStudentId("");
-              }}
-              required
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-            >
-              <option value="">— Pilih Kelas —</option>
-              {kelasList.map((k) => (
-                <option key={k} value={k}>
-                  {k}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1">Murid *</label>
-          <select
-            value={studentId}
-            onChange={(e) => setStudentId(e.target.value)}
-            required
-            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-          >
-            <option value="">— Pilih Murid —</option>
-            {studentList.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1">
-            Kesalahan * (maksimum {MAX_POINTS} mata)
-          </label>
-          <div className="flex flex-wrap gap-1.5 mb-2">
-            {catKeys.map((cat) => (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => {
-                  const first = offences.find((o) => o.code.startsWith(cat));
-                  if (first) addOffence(first.code);
-                }}
-                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 hover:border-amber-300"
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-          <select
-            onChange={(e) => {
-              if (e.target.value) addOffence(e.target.value);
-              e.target.value = "";
-            }}
-            defaultValue=""
-            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-          >
-            <option value="">Pilih kesalahan ringan…</option>
-            {offences.map((o) => (
-              <option key={o.code} value={o.code}>
-                {o.code} — {o.name} ({o.max_points} mata)
-              </option>
-            ))}
-          </select>
-          <div className="flex flex-wrap gap-2 mt-2">
-            {selected.map((s) => (
-              <span
-                key={s.code}
-                className="inline-flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-2.5 py-1 text-xs"
-              >
-                <span className="font-mono font-bold">{s.code}</span>
-                {s.name} <span className="font-bold">{s.max_points} mata</span>
-                <button type="button" onClick={() => setSelected((prev) => prev.filter((x) => x.code !== s.code))} className="text-red-400 font-bold">
-                  ×
-                </button>
-              </span>
-            ))}
-          </div>
-          <div className="text-sm mt-2 font-semibold text-amber-700">
-            Jumlah mata SPSM: {total} / {MAX_POINTS}
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1">Nama Pengawas yang Melapor *</label>
-          <input
-            value={reporterName}
-            onChange={(e) => setReporterName(e.target.value)}
-            required
-            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1">Butiran Kesalahan *</label>
-          <textarea
-            value={details}
-            onChange={(e) => setDetails(e.target.value)}
-            required
-            rows={2}
-            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-          />
-        </div>
-
-        <button
-          type="submit"
-          disabled={busy || selected.length === 0}
-          className="bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white text-sm font-semibold rounded-lg px-5 py-2.5"
-        >
-          {busy ? "Menghantar…" : "Hantar untuk Semakan"}
-        </button>
-      </form>
-    </div>
-  );
+  if (submitted) return <div className="mx-auto max-w-xl pt-8"><Card className="p-8 text-center sm:p-12"><div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-success-50 text-success-800"><Icon name="check" size={30} /></div><h1 className="mt-6 font-display text-3xl font-semibold text-brand-950">Kad peringatan dihantar</h1><p className="mx-auto mt-3 max-w-md text-sm leading-6 text-ink-600">Laporan telah dihantar kepada Guru Disiplin untuk semakan. Tiada sejarah laporan disimpan dalam ruang pengawas ini.</p><Button className="mt-7" onClick={() => { setSubmitted(false); setStep(0); setStudent(null); setOffences([]); setReporter(""); setDate(""); setTime(""); setDetails(""); }}>Buat laporan baharu</Button></Card></div>;
+  return <div className="mx-auto max-w-[1000px]"><PageHeader eyebrow="Ruang pengawas · B03" title="Kad peringatan" description="Lapor kesalahan ringan sahaja. Jumlah maksimum ialah 5 mata SPSM dan laporan akan disemak oleh Guru Disiplin." actions={<PointsBadge points={total} />} />{error ? <Alert tone="danger" className="mb-5">{error}</Alert> : null}<div className="mb-6 grid grid-cols-3 gap-2 sm:gap-4">{["Pilih murid", "Catat kejadian", "Semak & hantar"].map((label, index) => <div key={label} className={`border-t-2 pt-3 ${index <= step ? "border-gold-500" : "border-ink-200"}`}><div className={`font-mono text-[10px] font-bold ${index <= step ? "text-gold-800" : "text-ink-400"}`}>0{index + 1}</div><div className={`mt-1 text-xs font-semibold sm:text-sm ${index === step ? "text-brand-950" : "text-ink-500"}`}>{label}</div></div>)}</div><Card className="p-5 sm:p-7">{step === 0 ? <section><h2 className="font-display text-2xl font-semibold text-brand-950">Pilih murid</h2><p className="mt-1 mb-5 text-sm text-ink-600">Cari nama murid yang menerima kad peringatan.</p><StudentPicker value={student} onChange={setStudent} /></section> : null}{step === 1 ? <section><h2 className="font-display text-2xl font-semibold text-brand-950">Catat kejadian</h2><p className="mt-1 mb-5 text-sm text-ink-600">B03 hanya untuk kesalahan ringan yang dibenarkan, maksimum 5 mata.</p><div className="mb-5 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-950">{student?.name} · Tingkatan {student?.tingkatan}, {student?.kelas}</div><div className="grid gap-4 sm:grid-cols-2"><label className="block"><span className="mb-1.5 block text-sm font-semibold text-ink-800">Tarikh <span className="text-danger-700">*</span></span><input type="date" value={date} onChange={(event) => setDate(event.target.value)} className="h-11 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200" /></label><label className="block"><span className="mb-1.5 block text-sm font-semibold text-ink-800">Masa</span><input type="time" value={time} onChange={(event) => setTime(event.target.value)} className="h-11 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200" /></label></div><label className="mt-4 block"><span className="mb-1.5 block text-sm font-semibold text-ink-800">Nama pengawas yang melapor <span className="text-danger-700">*</span></span><input value={reporter} onChange={(event) => setReporter(event.target.value)} placeholder="Nama pengawas…" className="h-11 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200" /></label><div className="mt-4"><span className="mb-1.5 block text-sm font-semibold text-ink-800">Kesalahan <span className="text-danger-700">*</span></span><OffencePicker prefectOnly maxPoints={MAX_POINTS} onChange={setOffences} /></div><label className="mt-4 block"><span className="mb-1.5 block text-sm font-semibold text-ink-800">Butiran kejadian <span className="text-danger-700">*</span></span><textarea value={details} onChange={(event) => setDetails(event.target.value)} rows={4} placeholder="Huraian ringkas apa yang berlaku…" className="w-full rounded-lg border border-ink-200 bg-white px-3 py-2.5 text-sm leading-6 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200" /></label></section> : null}{step === 2 ? <section><h2 className="font-display text-2xl font-semibold text-brand-950">Semak & hantar</h2><p className="mt-1 mb-5 text-sm text-ink-600">Semak maklumat sebelum kad dihantar untuk semakan Guru Disiplin.</p><div className="space-y-4"><p className="text-sm"><strong>Murid:</strong> {student?.name} · {student?.tingkatan} {student?.kelas}</p><p className="text-sm"><strong>Tarikh:</strong> {date}{time ? ` · ${time}` : ""}</p><p className="text-sm"><strong>Pengawas:</strong> {reporter}</p><div><strong className="text-sm">Kesalahan:</strong><div className="mt-2 space-y-2">{offences.map((offence) => <div key={offence.code} className="flex items-start justify-between rounded-lg border border-ink-100 px-3 py-2 text-sm"><span><strong className="font-mono text-brand-700">{offence.code}</strong> · {offence.name}</span><span className="font-mono font-semibold text-gold-800">{offence.max_points}</span></div>)}</div></div><p className="whitespace-pre-wrap text-sm leading-6"><strong>Butiran:</strong><br />{details}</p></div></section> : null}<div className="mt-8 flex flex-col-reverse gap-3 border-t border-ink-100 pt-5 sm:flex-row sm:justify-between"><Button variant="ghost" onClick={() => { setError(""); setStep((value) => Math.max(0, value - 1)); }} disabled={step === 0}>Kembali</Button>{step < 2 ? <Button variant="gold" onClick={next}>Teruskan <Icon name="chevronRight" size={16} /></Button> : <Button variant="gold" disabled={busy} onClick={submit}>{busy ? "Menghantar…" : "Hantar untuk semakan"}<Icon name="check" size={16} /></Button>}</div></Card></div>;
 }

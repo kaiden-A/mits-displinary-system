@@ -29,6 +29,7 @@ export interface PengawasSession {
   sub: string;
   name: string;
   email: string;
+  expires_at: number;
   roles: string[];
 }
 
@@ -59,6 +60,7 @@ async function decodePengawas(token: string): Promise<PengawasSession | null> {
       sub: (payload.sub as string) || "",
       name: (payload.name as string) || "",
       email: (payload.email as string) || "",
+      expires_at: (payload.exp as number) || 0,
       roles: ["pengawas"],
     };
   } catch {

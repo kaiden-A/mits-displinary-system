@@ -1,5 +1,7 @@
 from pydantic import BaseModel
 
+from .cases import CaseOut
+
 
 class OffenceOut(BaseModel):
     code: str
@@ -30,3 +32,10 @@ class StudentOut(BaseModel):
 class StudentListOut(BaseModel):
     total: int
     items: list[StudentOut]
+
+
+class StudentSummaryOut(BaseModel):
+    student: StudentOut
+    cases: list[CaseOut]
+    recorded_cases: list[CaseOut]
+    historical_points: int

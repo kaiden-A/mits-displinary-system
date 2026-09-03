@@ -9,7 +9,13 @@ from ..config import settings
 from ..database import get_db
 from ..dependencies import require_roles
 from ..models import PengawasAccount
-from ..schemas import PengawasAccountCreate, PengawasAccountOut, Principal, ResetPasswordIn
+from ..schemas import (
+    LockPengawasIn,
+    PengawasAccountCreate,
+    PengawasAccountOut,
+    Principal,
+    ResetPasswordIn,
+)
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
 
@@ -61,20 +67,22 @@ def reset_pengawas_password(
 @router.post("/pengawas/{account_id}/lock")
 def lock_pengawas(
     account_id: int,
-    locked: bool,
+    locked: bool | None = None,
     db: Session = Depends(get_db),
     _: Principal = Depends(manage_accounts),
+    payload: LockPengawasIn | None = None,
 ):
     account = db.get(PengawasAccount, account_id)
     if not account:
         raise HTTPException(status_code=404, detail="account not found")
-    if locked:
+    should_lock = payload.locked if payload is not None else (locked if locked is not None else True)
+    if should_lock:
         account.locked_until = datetime.now(timezone.utc) + timedelta(days=365)
     else:
         account.locked_until = None
         account.failed_attempts = 0
     db.commit()
-    return {"ok": True}
+    return {"ok": True, "locked": should_lock}
 
 
 @router.post("/pengawas/{account_id}/toggle-active")

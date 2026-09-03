@@ -1,6 +1,7 @@
 from .auth import (
     PengawasAccountCreate,
     PengawasAccountOut,
+    LockPengawasIn,
     PengawasLoginIn,
     Principal,
     ResetPasswordIn,
@@ -14,10 +15,11 @@ from .cases import (
     CaseEventOut,
     CaseOut,
     DocPatch,
+    MeetingPatch,
     OffenceIn,
     TransitionIn,
 )
-from .catalogue import LadderTierOut, OffenceOut, StudentListOut, StudentOut
+from .catalogue import LadderTierOut, OffenceOut, StudentListOut, StudentOut, StudentSummaryOut
 from .notifications import NotificationOut
 
 __all__ = [
@@ -30,6 +32,8 @@ __all__ = [
     "CaseOut",
     "DocPatch",
     "LadderTierOut",
+    "LockPengawasIn",
+    "MeetingPatch",
     "NotificationOut",
     "OffenceIn",
     "OffenceOut",
@@ -40,5 +44,6 @@ __all__ = [
     "ResetPasswordIn",
     "StudentListOut",
     "StudentOut",
+    "StudentSummaryOut",
     "TransitionIn",
 ]

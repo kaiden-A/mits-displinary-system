@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getSessionFromCookies, SESSION_COOKIE, PW_COOKIE } from "@/lib/auth";
-import { canAccessRoute } from "@/lib/permissions";
+import { canAccessRoute, isManager } from "@/lib/permissions";
 
 export async function proxy(request: NextRequest) {
   const session = await getSessionFromCookies(
@@ -13,7 +13,7 @@ export async function proxy(request: NextRequest) {
 
   if (pathname === "/login" || pathname === "/login-pengawas") {
     if (session) {
-      return NextResponse.redirect(new URL(session.authType === "pengawas" ? "/kad" : "/dashboard", request.url));
+      return NextResponse.redirect(new URL(homePath(session), request.url));
     }
     return NextResponse.next();
   }
@@ -28,11 +28,15 @@ export async function proxy(request: NextRequest) {
   }
 
   if (!canAccessRoute(session, pathname)) {
-    const home = session.authType === "pengawas" ? "/kad" : "/dashboard";
-    return NextResponse.redirect(new URL(home, request.url));
+    return NextResponse.redirect(new URL(homePath(session), request.url));
   }
 
   return NextResponse.next();
+}
+
+function homePath(session: NonNullable<Awaited<ReturnType<typeof getSessionFromCookies>>>): string {
+  if (session.authType === "pengawas") return "/kad";
+  return isManager(session) ? "/dashboard" : "/aduan";
 }
 
 export const config = {

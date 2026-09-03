@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -14,26 +15,38 @@ class CaseCreate(BaseModel):
     student_source_id: int
     offences: list[OffenceIn] = Field(min_length=1)
     details: str = ""
-    docs: dict = {}
+    docs: dict[str, Any] = Field(default_factory=dict)
+    # These named fields make document payloads convenient for clients while
+    # retaining the existing docs mapping used by stored cases.
+    b01: dict[str, Any] | None = None
+    b03: dict[str, Any] | None = None
+    b05: dict[str, Any] | None = None
+    b06: dict[str, Any] | None = None
+    b07: dict[str, Any] | None = None
+    b08: dict[str, Any] | None = None
     reporter_name_override: str | None = None  # pengawas enters the reporting name manually
 
 
 class B02In(BaseModel):
-    fields: dict = {}
+    fields: dict[str, Any] = Field(default_factory=dict)
 
 
 class TransitionIn(BaseModel):
     action: str
 
 
+class MeetingPatch(BaseModel):
+    meeting: dict[str, Any] = Field(default_factory=dict)
+
+
 class DocPatch(BaseModel):
     doc_code: str = Field(pattern="^(b01|b03|b05|b06|b07|b08)$")
-    data: dict = {}
+    data: dict[str, Any] = Field(default_factory=dict)
 
 
 class CaseDocOut(BaseModel):
     doc_code: str
-    data: dict
+    data: dict[str, Any] | None = Field(default_factory=dict)
 
 
 class B02Out(BaseModel):
@@ -41,7 +54,7 @@ class B02Out(BaseModel):
     fill_by: str
     fill_role: str
     filled_at: datetime
-    fields: dict
+    fields: dict[str, Any] = Field(default_factory=dict)
 
 
 class CaseEventOut(BaseModel):
@@ -59,7 +72,7 @@ class CaseOut(BaseModel):
     source: str
     status: str
     student_source_id: int
-    student_snapshot: dict
+    student_snapshot: dict[str, Any] = Field(default_factory=dict)
     reporter_name: str
     reporter_role: str
     points: int
@@ -75,3 +88,9 @@ class CaseDetailOut(CaseOut):
     events: list[CaseEventOut]
     b02_forms: list[B02Out]
     docs: list[CaseDocOut]
+    b01: dict[str, Any] | None = None
+    b03: dict[str, Any] | None = None
+    b05: dict[str, Any] | None = None
+    b06: dict[str, Any] | None = None
+    b07: dict[str, Any] | None = None
+    b08: dict[str, Any] | None = None

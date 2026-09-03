@@ -1,46 +1,16 @@
 import Link from "next/link";
+import { Alert, Icon } from "@/components/ui";
 
 const ERROR_MESSAGES: Record<string, string> = {
-  access_denied: "Sign in was cancelled or not allowed.",
-  invalid_state: "Sign in failed. Please try again.",
-  token_exchange_failed: "Could not complete sign in. Please try again.",
-  invalid_token: "Sign in verification failed. Please try again.",
-  forbidden_org: "Your account is not authorized to access this system.",
+  access_denied: "Log masuk dibatalkan atau tidak dibenarkan.",
+  invalid_state: "Log masuk gagal. Cuba sekali lagi.",
+  token_exchange_failed: "Log masuk tidak dapat diselesaikan. Cuba sekali lagi.",
+  invalid_token: "Pengesahan log masuk gagal. Cuba sekali lagi.",
+  forbidden_org: "Akaun ini bukan daripada organisasi yang dibenarkan.",
+  forbidden_role: "Akaun ini belum diberi peranan SPSM. Sila hubungi pentadbir.",
 };
 
-export default async function LoginPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string }>;
-}) {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const { error } = await searchParams;
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-100">
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8 w-full max-w-md text-center">
-        <div className="w-14 h-14 rounded-2xl bg-emerald-500 mx-auto flex items-center justify-center text-white mb-4">
-          <i className="fa-solid fa-shield-halved text-xl" />
-        </div>
-        <h1 className="text-xl font-bold text-slate-800">SPSM · MITS</h1>
-        <p className="text-sm text-slate-500 mt-1">Sistem Pembangunan Sahsiah Murid — Log masuk Staf</p>
-
-        {error ? (
-          <p className="mt-4 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-            {ERROR_MESSAGES[error] || "Sign in failed. Please try again."}
-          </p>
-        ) : null}
-
-        <a
-          href="/api/auth/login"
-          className="mt-6 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg"
-        >
-          Sign in with Zitadel
-        </a>
-
-        <Link href="/login-pengawas" className="block mt-4 text-xs text-slate-400 hover:text-emerald-700">
-          Log masuk pengawas (komputer awam) →
-        </Link>
-      </div>
-    </div>
-  );
+  return <div className="grid min-h-dvh bg-canvas lg:grid-cols-[1.05fr_0.95fr]"><div className="relative hidden overflow-hidden bg-brand-950 p-12 text-white lg:flex lg:flex-col lg:justify-between"><div className="absolute -right-24 -top-24 h-80 w-80 rounded-full border border-gold-300/20" /><div className="absolute -bottom-28 -left-20 h-72 w-72 rounded-full border border-gold-300/10" /><div className="relative"><div className="flex items-center gap-3"><div className="flex h-12 w-12 items-center justify-center rounded-xl border border-gold-300/40 bg-brand-700 text-gold-100"><Icon name="shield" size={25} /></div><div><p className="font-display text-2xl font-semibold">SPSM · MITS</p><p className="text-[10px] font-bold uppercase tracking-[0.17em] text-brand-200">Sistem pembangunan sahsiah murid</p></div></div><div className="mt-28 max-w-lg"><p className="text-[11px] font-bold uppercase tracking-[0.2em] text-gold-300">Ruang kerja disiplin</p><h1 className="mt-4 font-display text-6xl font-semibold leading-[0.95] text-white">Rekod yang jelas. Tindakan yang teratur.</h1><p className="mt-6 max-w-md text-base leading-7 text-brand-100">Satu ruang untuk melaporkan salah laku, menjalankan siasatan, dan mengurus tindakan mengikut Modul SPSM.</p></div></div><p className="relative text-xs text-brand-300">Maahad Integrasi Tahfiz Selangor</p></div><div className="flex items-center justify-center px-5 py-10 sm:px-8"><div className="w-full max-w-md"><div className="mb-8 flex items-center gap-3 lg:hidden"><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-700 text-gold-100"><Icon name="shield" size={22} /></div><div><p className="font-display text-xl font-semibold text-brand-950">SPSM · MITS</p><p className="text-[10px] font-bold uppercase tracking-[0.15em] text-gold-700">Log masuk staf</p></div></div><div className="rounded-2xl border border-ink-100 bg-surface p-6 shadow-card sm:p-8"><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-gold-700">Portal staf</p><h2 className="mt-2 font-display text-3xl font-semibold text-brand-950">Selamat datang</h2><p className="mt-2 text-sm leading-6 text-ink-600">Gunakan akaun staf MITS untuk mengurus laporan dan kes disiplin.</p>{error ? <Alert tone="danger" className="mt-5">{ERROR_MESSAGES[error] || "Log masuk gagal. Cuba sekali lagi."}</Alert> : null}<a href="/api/auth/login" className="mt-7 flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-brand-700 px-4 text-sm font-bold text-white hover:bg-brand-800"><Icon name="key" size={17} />Log masuk dengan akaun staf</a><div className="my-6 flex items-center gap-3 text-xs text-ink-400"><span className="h-px flex-1 bg-ink-100" />atau<span className="h-px flex-1 bg-ink-100" /></div><Link href="/login-pengawas" className="flex min-h-12 items-center justify-center gap-2 rounded-lg border border-gold-300 bg-gold-50 px-4 text-sm font-bold text-gold-900 hover:bg-gold-100"><Icon name="warning" size={17} />Log masuk pengawas</Link><p className="mt-5 text-center text-xs leading-5 text-ink-500">Ruang pengawas digunakan pada komputer kiosk awam dan mempunyai sesi terhad 15 minit.</p></div></div></div></div>;
 }

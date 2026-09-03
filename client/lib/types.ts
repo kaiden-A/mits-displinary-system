@@ -30,12 +30,13 @@ export interface CaseSummary {
   source: string;
   status: string;
   student_source_id: number;
-  student_snapshot: { name: string; kelas_label: string; ic_number?: string };
+  student_snapshot: { name: string; kelas_label: string; tingkatan?: number; kelas?: string; ic_number?: string };
   reporter_name: string;
   reporter_role: string;
   points: number;
   details: string;
   warning_level: string;
+  meeting?: Record<string, string> | null;
   created_at: string;
   updated_at: string;
 }
@@ -45,6 +46,27 @@ export interface CaseDetail extends CaseSummary {
   events: CaseEvent[];
   b02_forms: B02Form[];
   docs: CaseDoc[];
+  b01?: Record<string, unknown> | null;
+  b03?: Record<string, unknown> | null;
+  b05?: Record<string, unknown> | null;
+  b06?: Record<string, unknown> | null;
+  b07?: Record<string, unknown> | null;
+  b08?: Record<string, unknown> | null;
+}
+
+export interface StudentSummary {
+  student: Student;
+  cases: CaseSummary[];
+  historical_points: number;
+}
+
+export interface Notification {
+  id: number;
+  ntype: string;
+  case_id: number | null;
+  text: string;
+  read: boolean;
+  created_at: string;
 }
 
 export interface Student {

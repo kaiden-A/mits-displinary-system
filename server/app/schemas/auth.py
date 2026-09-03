@@ -8,7 +8,7 @@ class Principal(BaseModel):
     sub: str
     name: str
     email: str = ""
-    roles: list[str] = []
+    roles: list[str] = Field(default_factory=list)
 
 
 class PengawasLoginIn(BaseModel):
@@ -24,6 +24,10 @@ class PengawasAccountCreate(BaseModel):
 
 class ResetPasswordIn(BaseModel):
     new_password: str = Field(min_length=8)
+
+
+class LockPengawasIn(BaseModel):
+    locked: bool = True
 
 
 class PengawasAccountOut(BaseModel):

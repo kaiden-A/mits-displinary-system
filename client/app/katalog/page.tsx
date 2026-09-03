@@ -1,111 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { clientApi } from "@/lib/client-api";
 import type { LadderTier } from "@/lib/types";
+import { Card, EmptyState, Icon, PageHeader } from "@/components/ui";
+import type { OffenceChoice } from "@/components/OffencePicker";
 
-interface OffenceOption {
-  code: string;
-  name: string;
-  min_points: number;
-  max_points: number;
-  action: string;
-}
-
-export default function KatalogPage() {
-  const [offences, setOffences] = useState<OffenceOption[]>([]);
+export default function CataloguePage() {
+  const [offences, setOffences] = useState<OffenceChoice[]>([]);
   const [ladder, setLadder] = useState<LadderTier[]>([]);
-  const [q, setQ] = useState("");
-  const [cat, setCat] = useState("ALL");
-
-  useEffect(() => {
-    clientApi<OffenceOption[]>("/offences").then(setOffences).catch(() => setOffences([]));
-    clientApi<LadderTier[]>("/spsm/ladder").then(setLadder).catch(() => setLadder([]));
-  }, []);
-
-  const cats = [...new Set(offences.map((o) => o.code[0]))];
-  const rows = offences.filter((o) => {
-    if (cat !== "ALL" && !o.code.startsWith(cat)) return false;
-    if (q && !o.name.toLowerCase().includes(q.toLowerCase()) && !o.code.toLowerCase().includes(q.toLowerCase()))
-      return false;
-    return true;
-  });
-
-  return (
-    <div>
-      <h1 className="text-xl font-bold text-slate-800">Katalog Kesalahan & Tindakan SPSM</h1>
-      <p className="text-sm text-slate-500 mb-4">{offences.length} jenis kesalahan</p>
-
-      <div className="grid lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-          <div className="flex flex-wrap gap-2 mb-3">
-            <button
-              onClick={() => setCat("ALL")}
-              className={`rounded-lg border px-2.5 py-1 text-xs font-semibold ${cat === "ALL" ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-slate-600"}`}
-            >
-              Semua
-            </button>
-            {cats.map((c) => (
-              <button
-                key={c}
-                onClick={() => setCat(c)}
-                className={`rounded-lg border px-2.5 py-1 text-xs font-semibold ${cat === c ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-slate-600"}`}
-              >
-                {c}
-              </button>
-            ))}
-          </div>
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Cari kesalahan (kod / nama)…"
-            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm mb-3"
-          />
-          <div className="max-h-[560px] overflow-y-auto">
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-white">
-                <tr className="text-left text-xs uppercase tracking-wide text-slate-400">
-                  <th className="px-3 py-2">Kod</th>
-                  <th className="px-3 py-2">Kesalahan</th>
-                  <th className="px-3 py-2 text-center">Mata</th>
-                  <th className="px-3 py-2">Tindakan</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((o) => (
-                  <tr key={o.code} className="border-t border-slate-100">
-                    <td className="px-3 py-2 font-mono text-xs font-semibold text-emerald-700">{o.code}</td>
-                    <td className="px-3 py-2 text-slate-700">{o.name}</td>
-                    <td className="px-3 py-2 text-center font-bold">
-                      {o.min_points === o.max_points ? o.max_points : `${o.min_points}-${o.max_points}`}
-                    </td>
-                    <td className="px-3 py-2 text-xs text-slate-500">{o.action || "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 h-fit">
-          <h2 className="font-semibold text-slate-800 mb-3">Langkah / Hukuman Mengikut Mata SPSM</h2>
-          <div className="space-y-3">
-            {ladder.map((t) => (
-              <div key={t.tier} className="rounded-lg border border-slate-200 p-3">
-                <div className="text-xs font-bold text-emerald-700 uppercase">{t.label}</div>
-                <ul className="mt-1.5 space-y-1">
-                  {t.steps.map((s, i) => (
-                    <li key={i} className="text-xs text-slate-600 flex gap-1.5">
-                      <span className="text-emerald-400">•</span>
-                      {s}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState("ALL");
+  const [tab, setTab] = useState<"offences" | "ladder">("offences");
+  useEffect(() => { Promise.all([clientApi<OffenceChoice[]>("/offences"), clientApi<LadderTier[]>("/spsm/ladder")]).then(([items, tiers]) => { setOffences(items); setLadder(tiers); }); }, []);
+  const categories = useMemo(() => [...new Set(offences.map((item) => item.code[0]))], [offences]);
+  const rows = offences.filter((item) => (category === "ALL" || item.code.startsWith(category)) && (!query || `${item.code} ${item.name} ${item.action}`.toLowerCase().includes(query.toLowerCase())));
+  return <div className="mx-auto max-w-[1440px]"><PageHeader eyebrow="Rujukan" title="Katalog SPSM" description="Rujuk kod kesalahan, mata yang berkaitan, dan tindakan yang ditetapkan dalam Modul SPSM." /><div className="mb-5 flex gap-1 border-b border-ink-200" role="tablist"><button type="button" role="tab" aria-selected={tab === "offences"} onClick={() => setTab("offences")} className={`min-h-11 cursor-pointer border-b-2 px-4 text-sm font-semibold ${tab === "offences" ? "border-gold-500 text-brand-800" : "border-transparent text-ink-600"}`}>Jenis kesalahan <span className="ml-1 rounded-full bg-ink-100 px-2 py-0.5 text-xs">{offences.length}</span></button><button type="button" role="tab" aria-selected={tab === "ladder"} onClick={() => setTab("ladder")} className={`min-h-11 cursor-pointer border-b-2 px-4 text-sm font-semibold ${tab === "ladder" ? "border-gold-500 text-brand-800" : "border-transparent text-ink-600"}`}>Tahap tindakan</button></div>{tab === "offences" ? <Card className="overflow-hidden"><div className="grid gap-3 border-b border-ink-100 bg-brand-50/60 p-4 md:grid-cols-[minmax(0,1fr)_210px]"><label className="relative"><span className="sr-only">Cari kesalahan</span><Icon name="search" size={17} className="pointer-events-none absolute left-3 top-3.5 text-ink-400" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cari kod, nama, atau tindakan…" className="h-11 w-full rounded-lg border border-ink-200 bg-white pl-10 pr-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200" /></label><select value={category} onChange={(event) => setCategory(event.target.value)} className="h-11 rounded-lg border border-ink-200 bg-white px-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"><option value="ALL">Semua kategori</option>{categories.map((item) => <option key={item} value={item}>Kategori {item}</option>)}</select></div><div className="overflow-x-auto"><table className="w-full min-w-[720px] text-left text-sm"><thead className="bg-white text-[10px] font-bold uppercase tracking-[0.14em] text-ink-600"><tr><th className="px-5 py-3">Kod</th><th className="px-5 py-3">Kesalahan</th><th className="px-5 py-3">Mata</th><th className="px-5 py-3">Tindakan disiplin</th></tr></thead><tbody className="divide-y divide-ink-100">{rows.map((item) => <tr key={item.code} className="hover:bg-brand-50/50"><td className="px-5 py-4 align-top font-mono text-xs font-semibold text-brand-700">{item.code}</td><td className="max-w-[520px] px-5 py-4 align-top leading-6 text-ink-800">{item.name}</td><td className="whitespace-nowrap px-5 py-4 align-top font-mono font-semibold text-gold-800">{item.min_points === item.max_points ? item.max_points : `${item.min_points}–${item.max_points}`}</td><td className="px-5 py-4 align-top text-sm text-ink-600">{item.action || "Tiada tindakan khusus"}</td></tr>)}</tbody></table>{!rows.length ? <EmptyState icon="search" title="Tiada padanan" description="Cuba carian atau kategori lain." /> : null}</div><div className="border-t border-ink-100 px-5 py-3 text-xs text-ink-500">{rows.length} daripada {offences.length} kesalahan dipaparkan</div></Card> : <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">{ladder.map((tier) => <Card key={tier.tier} className="p-5"><div className="flex items-start justify-between gap-3"><div><p className="text-[11px] font-bold uppercase tracking-[0.14em] text-gold-700">Peringkat {tier.tier}</p><h2 className="mt-1 font-display text-2xl font-semibold text-brand-950">{tier.label.replace(/^Peringkat \d+\s*/, "")}</h2></div><span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-50 font-mono text-sm font-semibold text-brand-700">{tier.tier}</span></div><ul className="mt-5 space-y-3 border-t border-ink-100 pt-4">{tier.steps.map((step) => <li key={step} className="flex gap-2 text-sm leading-6 text-ink-700"><Icon name="check" size={16} className="mt-1 shrink-0 text-success-700" />{step}</li>)}</ul></Card>)}</div>}</div>;
 }

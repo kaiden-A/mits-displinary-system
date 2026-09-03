@@ -8,6 +8,7 @@ export async function GET() {
   }
   return NextResponse.json({
     user: {
+      id: session.sub,
       auth_type: session.authType,
       name: session.name,
       email: session.email,

@@ -1,3 +1,5 @@
+import re
+
 import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -64,3 +66,10 @@ def snapshot_of(student: StudentCache) -> dict:
         "birth_year": student.birth_year,
         "year": student.year,
     }
+
+
+def mask_ic_number(ic_number: str | None) -> str:
+    """Mask all IC digits while retaining separators for a usable display value."""
+    if not ic_number:
+        return ic_number or ""
+    return re.sub(r"\d", "*", ic_number)

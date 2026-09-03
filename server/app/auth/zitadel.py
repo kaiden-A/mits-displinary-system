@@ -21,7 +21,8 @@ def _extract_roles(claims: dict) -> list[str]:
 
 
 def validate_staff_token(token: str) -> Principal:
-    """Validate a Zitadel access token (signature via JWKS, issuer, audience).
+    """Validate a Zitadel access token (signature via JWKS, issuer, audience,
+    optional org membership and SPSM role).
 
     Raises jwt.PyJWTError on invalid tokens.
     """
@@ -36,6 +37,11 @@ def validate_staff_token(token: str) -> Principal:
         audience=settings.zitadel_audience or None,
         options={"verify_aud": bool(settings.zitadel_audience)},
     )
+
+    if settings.zitadel_allowed_org_id:
+        org_id = str(claims.get("urn:zitadel:iam:user:resourceowner:id") or "")
+        if not org_id or org_id != settings.zitadel_allowed_org_id:
+            raise jwt.PyJWTError("user is not a member of the allowed organization")
 
     roles = _extract_roles(claims)
     if settings.zitadel_required_role and settings.zitadel_required_role not in roles:

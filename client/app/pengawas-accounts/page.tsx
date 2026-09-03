@@ -2,148 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { clientApi } from "@/lib/client-api";
+import { Alert, Button, Card, Icon, PageHeader } from "@/components/ui";
 
-interface Account {
-  id: number;
-  email: string;
-  full_name: string;
-  active: boolean;
-  locked_until: string | null;
-  failed_attempts: number;
-}
+interface Account { id: number; email: string; full_name: string; active: boolean; locked_until: string | null; failed_attempts: number }
 
 export default function PengawasAccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [error, setError] = useState("");
-  const [email, setEmail] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [password, setPassword] = useState("");
-
-  async function load() {
-    try {
-      setAccounts(await clientApi<Account[]>("/accounts/pengawas"));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  }
-
-  useEffect(() => {
-    load();
-  }, []);
-
-  async function create(e: React.FormEvent) {
-    e.preventDefault();
-    try {
-      await clientApi("/accounts/pengawas", {
-        method: "POST",
-        body: JSON.stringify({ email, full_name: fullName, password }),
-      });
-      setEmail("");
-      setFullName("");
-      setPassword("");
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  }
-
-  async function resetPassword(id: number) {
-    const newPassword = prompt("Kata laluan baharu (minimum 8 aksara):");
-    if (!newPassword) return;
-    try {
-      await clientApi(`/accounts/pengawas/${id}/reset-password`, {
-        method: "POST",
-        body: JSON.stringify({ new_password: newPassword }),
-      });
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  }
-
-  async function toggleActive(id: number, active: boolean) {
-    await clientApi(`/accounts/pengawas/${id}/toggle-active`, { method: "POST" });
-    await load();
-  }
-
-  return (
-    <div>
-      <h1 className="text-xl font-bold text-slate-800">Akaun Pengawas</h1>
-      <p className="text-sm text-slate-500 mb-4">
-        Akaun log masuk tempatan untuk pengawas (kiosk komputer awam, sesi 15 minit). Staf diurus melalui Zitadel console.
-      </p>
-
-      {error ? <p className="mb-4 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p> : null}
-
-      <form onSubmit={create} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-4 grid md:grid-cols-4 gap-3">
-        <input
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Email pengawas"
-          type="email"
-          required
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-        />
-        <input
-          value={fullName}
-          onChange={(e) => setFullName(e.target.value)}
-          placeholder="Nama penuh"
-          required
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-        />
-        <input
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Kata laluan"
-          type="password"
-          minLength={8}
-          required
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-        />
-        <button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg px-4 py-2">
-          Cipta Akaun
-        </button>
-      </form>
-
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-xs uppercase tracking-wide text-slate-400">
-              <th className="px-3 py-2">Nama</th>
-              <th className="px-3 py-2">Email</th>
-              <th className="px-3 py-2">Status</th>
-              <th className="px-3 py-2">Cubaan Gagal</th>
-              <th className="px-3 py-2"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {accounts.map((a) => (
-              <tr key={a.id} className="border-t border-slate-100">
-                <td className="px-3 py-2.5 font-medium">{a.full_name}</td>
-                <td className="px-3 py-2.5">{a.email}</td>
-                <td className="px-3 py-2.5 text-xs">
-                  {!a.active ? (
-                    <span className="text-red-600 font-semibold">Tidak aktif</span>
-                  ) : a.locked_until ? (
-                    <span className="text-amber-600 font-semibold">Dikunci</span>
-                  ) : (
-                    <span className="text-emerald-600 font-semibold">Aktif</span>
-                  )}
-                </td>
-                <td className="px-3 py-2.5">{a.failed_attempts}</td>
-                <td className="px-3 py-2.5 text-right space-x-2">
-                  <button onClick={() => resetPassword(a.id)} className="text-xs font-semibold text-slate-500 hover:text-emerald-700">
-                    Reset kata laluan
-                  </button>
-                  <button onClick={() => toggleActive(a.id, a.active)} className="text-xs font-semibold text-slate-500 hover:text-red-700">
-                    {a.active ? "Nyahaktif" : "Aktifkan"}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
+  const [email, setEmail] = useState(""); const [name, setName] = useState(""); const [password, setPassword] = useState("");
+  const [error, setError] = useState(""); const [notice, setNotice] = useState(""); const [busy, setBusy] = useState(false); const [resetFor, setResetFor] = useState<Account | null>(null); const [newPassword, setNewPassword] = useState("");
+  async function load() { try { setAccounts(await clientApi<Account[]>("/accounts/pengawas")); } catch (reason) { setError(reason instanceof Error ? reason.message : "Akaun tidak dapat dimuatkan."); } }
+  useEffect(() => { load(); }, []);
+  async function create(event: React.FormEvent) { event.preventDefault(); setBusy(true); setError(""); try { await clientApi("/accounts/pengawas", { method: "POST", body: JSON.stringify({ email, full_name: name, password }) }); setEmail(""); setName(""); setPassword(""); setNotice("Akaun pengawas telah dicipta."); await load(); } catch (reason) { setError(reason instanceof Error ? reason.message : "Akaun tidak berjaya dicipta."); } finally { setBusy(false); } }
+  async function resetPassword() { if (!resetFor) return; setBusy(true); try { await clientApi(`/accounts/pengawas/${resetFor.id}/reset-password`, { method: "POST", body: JSON.stringify({ new_password: newPassword }) }); setResetFor(null); setNewPassword(""); setNotice("Kata laluan telah ditetapkan semula."); await load(); } catch (reason) { setError(reason instanceof Error ? reason.message : "Kata laluan tidak berjaya ditetapkan semula."); } finally { setBusy(false); } }
+  async function toggleLock(account: Account) { setBusy(true); try { await clientApi(`/accounts/pengawas/${account.id}/lock`, { method: "POST", body: JSON.stringify({ locked: !account.locked_until }) }); setNotice(account.locked_until ? "Akaun telah dibuka semula." : "Akaun telah dikunci."); await load(); } catch (reason) { setError(reason instanceof Error ? reason.message : "Status akaun tidak berjaya dikemas kini."); } finally { setBusy(false); } }
+  return <div className="mx-auto max-w-[1200px]"><PageHeader eyebrow="Pentadbiran" title="Akaun pengawas" description="Urus akaun tempatan untuk komputer kiosk. Akaun pengawas tidak boleh melihat sejarah B03 selepas laporan dihantar." />{error ? <Alert tone="danger" className="mb-4">{error}</Alert> : null}{notice ? <Alert tone="success" className="mb-4">{notice}</Alert> : null}<Card className="mb-5 p-5"><div className="mb-4"><h2 className="font-display text-2xl font-semibold text-brand-950">Cipta akaun</h2><p className="mt-1 text-sm text-ink-600">Gunakan kata laluan sekurang-kurangnya 8 aksara.</p></div><form onSubmit={create} className="grid gap-4 md:grid-cols-[1fr_1fr_1fr_auto]"><label><span className="mb-1.5 block text-sm font-semibold text-ink-800">Nama penuh</span><input value={name} onChange={(event) => setName(event.target.value)} required autoComplete="name" className="h-11 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200" /></label><label><span className="mb-1.5 block text-sm font-semibold text-ink-800">Email</span><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoComplete="email" spellCheck={false} className="h-11 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200" /></label><label><span className="mb-1.5 block text-sm font-semibold text-ink-800">Kata laluan</span><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required minLength={8} autoComplete="new-password" className="h-11 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200" /></label><Button type="submit" disabled={busy} className="self-end">{busy ? "Mencipta…" : "Cipta akaun"}<Icon name="plus" size={16} /></Button></form></Card><Card className="overflow-hidden"><div className="border-b border-ink-100 px-5 py-4"><h2 className="font-display text-2xl font-semibold text-brand-950">Akaun berdaftar</h2><p className="mt-1 text-sm text-ink-600">{accounts.length} akaun pengawas</p></div><div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-brand-50 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-600"><tr><th className="px-5 py-3">Nama</th><th className="px-5 py-3">Email</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Cubaan gagal</th><th className="px-5 py-3"><span className="sr-only">Tindakan</span></th></tr></thead><tbody className="divide-y divide-ink-100">{accounts.map((account) => <tr key={account.id} className="hover:bg-brand-50/50"><td className="px-5 py-4 font-semibold text-brand-950">{account.full_name}</td><td className="px-5 py-4 text-ink-700">{account.email}</td><td className="px-5 py-4">{!account.active ? <span className="rounded-full border border-danger-200 bg-danger-50 px-2.5 py-1 text-xs font-bold text-danger-800">Tidak aktif</span> : account.locked_until ? <span className="rounded-full border border-gold-200 bg-gold-50 px-2.5 py-1 text-xs font-bold text-gold-800">Dikunci</span> : <span className="rounded-full border border-success-200 bg-success-50 px-2.5 py-1 text-xs font-bold text-success-800">Aktif</span>}</td><td className="px-5 py-4 font-mono text-ink-700">{account.failed_attempts}</td><td className="px-5 py-4 text-right"><div className="flex justify-end gap-2"><Button size="sm" variant="secondary" onClick={() => setResetFor(account)}><Icon name="key" size={15} />Reset kata laluan</Button><Button size="sm" variant="ghost" disabled={busy} onClick={() => toggleLock(account)}>{account.locked_until ? "Buka kunci" : "Kunci akaun"}</Button></div></td></tr>)}</tbody></table>{!accounts.length ? <div className="px-5 py-10 text-center text-sm text-ink-500">Belum ada akaun pengawas.</div> : null}</div></Card>{resetFor ? <div className="fixed inset-0 z-[70] flex items-center justify-center bg-brand-950/60 px-4" role="presentation"><div role="dialog" aria-modal="true" aria-labelledby="reset-title" className="w-full max-w-md rounded-xl border border-ink-100 bg-surface p-6 shadow-xl"><div className="flex items-start justify-between gap-3"><div><h2 id="reset-title" className="font-display text-2xl font-semibold text-brand-950">Reset kata laluan</h2><p className="mt-1 text-sm text-ink-600">{resetFor.full_name}</p></div><button type="button" aria-label="Tutup dialog" onClick={() => setResetFor(null)} className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg text-ink-600 hover:bg-ink-50"><Icon name="close" /></button></div><label className="mt-5 block"><span className="mb-1.5 block text-sm font-semibold text-ink-800">Kata laluan baharu</span><input type="password" minLength={8} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} autoComplete="new-password" className="h-11 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200" /></label><div className="mt-6 flex justify-end gap-2"><Button variant="ghost" onClick={() => setResetFor(null)}>Batal</Button><Button disabled={busy || newPassword.length < 8} onClick={resetPassword}>Simpan kata laluan</Button></div></div></div> : null}</div>;
 }

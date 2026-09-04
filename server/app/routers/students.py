@@ -42,7 +42,7 @@ def list_students(
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
 ):
-    limit = min(max(limit, 1), 200)
+    limit = min(max(limit, 1), 1000)
     stmt = select(StudentCache)
     if q:
         like = f"%{q.lower()}%"

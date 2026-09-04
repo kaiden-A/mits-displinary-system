@@ -17,14 +17,14 @@ export default function StudentPicker({ value, onChange, id = "student" }: { val
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const search = query.trim() ? `&q=${encodeURIComponent(query.trim())}` : "";
-      clientApi<{ total: number; items: Student[] }>(`/students?limit=100${search}`).then((data) => setStudents(data.items)).catch(() => setError("Senarai murid tidak dapat dimuatkan.")).finally(() => setLoading(false));
+      clientApi<{ total: number; items: Student[] }>(`/students?limit=1000${search}`).then((data) => setStudents(data.items)).catch(() => setError("Senarai murid tidak dapat dimuatkan.")).finally(() => setLoading(false));
     }, 180);
     return () => window.clearTimeout(timer);
   }, [query]);
 
   const grades = useMemo(() => [...new Set(students.map((student) => student.tingkatan))].sort((a, b) => a - b), [students]);
   const classes = useMemo(() => [...new Set(students.filter((student) => tingkatan === "ALL" || student.tingkatan === Number(tingkatan)).map((student) => student.kelas))].sort(), [students, tingkatan]);
-  const filtered = useMemo(() => students.filter((student) => (tingkatan === "ALL" || student.tingkatan === Number(tingkatan)) && (kelas === "ALL" || student.kelas === kelas)).slice(0, 40), [students, tingkatan, kelas]);
+  const filtered = useMemo(() => students.filter((student) => (tingkatan === "ALL" || student.tingkatan === Number(tingkatan)) && (kelas === "ALL" || student.kelas === kelas)).slice(0, 100), [students, tingkatan, kelas]);
 
   if (value) return <div className="flex items-center gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-700 text-gold-100"><Icon name="user" size={18} /></div><div className="min-w-0 flex-1"><p className="truncate font-semibold text-brand-950">{value.name}</p><p className="mt-0.5 text-xs text-ink-600">Tingkatan {value.tingkatan} · {value.kelas}</p></div><button type="button" aria-label="Tukar murid" onClick={() => { onChange(null); setOpen(true); }} className="min-h-10 cursor-pointer rounded-lg px-3 text-xs font-bold text-brand-700 hover:bg-brand-100">Tukar</button></div>;
 

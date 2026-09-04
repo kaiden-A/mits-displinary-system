@@ -17,7 +17,7 @@ export default function StudentsPage() {
   const [error, setError] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [syncNotice, setSyncNotice] = useState("");
-  useEffect(() => { Promise.all([clientApi<{ total: number; items: Student[] }>("/students?limit=200"), clientApi<CaseSummary[]>("/cases?limit=200")]).then(([studentData, caseData]) => { setStudents(studentData.items); setCases(caseData); }).catch((reason) => setError(reason instanceof Error ? reason.message : "Data murid tidak dapat dimuatkan.")).finally(() => setLoading(false)); }, []);
+  useEffect(() => { Promise.all([clientApi<{ total: number; items: Student[] }>("/students?limit=1000"), clientApi<CaseSummary[]>("/cases?limit=200")]).then(([studentData, caseData]) => { setStudents(studentData.items); setCases(caseData); }).catch((reason) => setError(reason instanceof Error ? reason.message : "Data murid tidak dapat dimuatkan.")).finally(() => setLoading(false)); }, []);
   async function syncStudents() {
     setSyncing(true);
     setSyncNotice("");
@@ -25,7 +25,7 @@ export default function StudentsPage() {
     try {
       const result = await clientApi<{ synced: number }>("/students/sync", { method: "POST" });
       setSyncNotice(`${result.synced} murid telah disegerakkan.`);
-      const studentData = await clientApi<{ total: number; items: Student[] }>("/students?limit=200");
+      const studentData = await clientApi<{ total: number; items: Student[] }>("/students?limit=1000");
       setStudents(studentData.items);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Data murid tidak dapat disegerakkan.");

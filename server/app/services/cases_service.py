@@ -197,6 +197,21 @@ def add_b02(db: Session, case_id: int, fields: dict, principal: Principal) -> B0
 
     fill_role = principal_role(principal)
     fields = dict(fields or {})
+    # Complaint intake details are taken from the case record, not re-entered
+    # by the investigator. "Diterima oleh" is the officer who received the
+    # complaint: the discipline staff who filed the case, or the discipline
+    # staff now taking it for investigation.
+    if not fields.get("aduan"):
+        fields["aduan"] = case.details or ""
+    if not fields.get("tarikhAduan"):
+        fields["tarikhAduan"] = case.created_at.date().isoformat()
+    if not fields.get("butiranPengadu"):
+        fields["butiranPengadu"] = case.reporter_name
+    if not fields.get("diterimaOleh"):
+        if case.reporter_role in MANAGER_ROLES:
+            fields["diterimaOleh"] = case.reporter_name
+        elif fill_role in MANAGER_ROLES:
+            fields["diterimaOleh"] = principal.name
     fields["disediakanOleh"] = principal.name
     fields["disediakanJawatan"] = ROLE_LABELS.get(fill_role, fill_role)
     fields["disediakanTarikh"] = datetime.now().date().isoformat()

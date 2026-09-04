@@ -2,6 +2,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
+from .auth.dev import DEV_SUB_PREFIX  # DEV ONLY — delete after testing
 from .auth.pengawas import PW_SUB_PREFIX, decode_session_token
 from .auth.zitadel import validate_staff_token
 from .database import get_db
@@ -30,6 +31,20 @@ def get_current_principal(
                 name=str(pengawas_claims.get("name") or ""),
                 email=str(pengawas_claims.get("email") or ""),
                 roles=["pengawas"],
+            )
+    except Exception:
+        pass
+
+    # DEV ONLY — local staff login to simulate roles. DELETE AFTER TESTING.
+    try:
+        dev_claims = decode_session_token(token)
+        if dev_claims and str(dev_claims.get("sub", "")).startswith(DEV_SUB_PREFIX):
+            return Principal(
+                auth_type="staff",
+                sub=str(dev_claims["sub"]),
+                name=str(dev_claims.get("name") or ""),
+                email=str(dev_claims.get("email") or ""),
+                roles=[str(role) for role in (dev_claims.get("roles") or [])],
             )
     except Exception:
         pass

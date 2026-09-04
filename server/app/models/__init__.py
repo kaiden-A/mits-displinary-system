@@ -6,6 +6,7 @@ from .case import (
     CaseOffence,
     Notification,
 )
+from .dev_user import DevUser  # DEV ONLY — delete after testing
 from .pengawas import PengawasAccount
 from .student import StudentCache
 
@@ -16,6 +17,7 @@ __all__ = [
     "CaseEvent",
     "CaseOffence",
     "Notification",
+    "DevUser",  # DEV ONLY — delete after testing
     "PengawasAccount",
     "StudentCache",
 ]

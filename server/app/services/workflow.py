@@ -136,7 +136,7 @@ def status_label(status: str) -> str:
     return status
 
 
-def next_steps(source: str, points: int, status: str, has_b02: bool) -> list[dict]:
+def next_steps(source: str, points: int, status: str, has_b02: bool, needs_b07: bool = False) -> list[dict]:
     """Port of the sample's nextSteps guidance."""
     steps: list[dict] = []
 
@@ -170,7 +170,11 @@ def next_steps(source: str, points: int, status: str, has_b02: bool) -> list[dic
             add("Murid menghadiri sesi kaunseling — rekod setiap sesi dalam dokumen kes (wajib sebelum tutup kes).", "Guru Disiplin")
     elif status == "STUDENT_ACK":
         add("Isi Kad SPSM (LAM/DIS/002-1).", "Guru Disiplin")
-        add("Sediakan Surat Pemberitahuan / Amaran (B06) dan Surat Akujanji (B08) jika berkaitan.", "Guru Disiplin", "prepare")
+        add("Sediakan Surat Pemberitahuan / Amaran (B06).", "Guru Disiplin", "prepare")
+        if points >= 21:
+            add("Sediakan Surat Akujanji (B08).", "Guru Disiplin")
+        if needs_b07:
+            add("Sediakan Borang Barang Rampasan (B07).", "Guru Disiplin")
     elif status == "ACTION_PREPARED":
         if 31 <= points <= 40:
             add("Rekod hukuman Peringkat 5 (gantung asrama / gantung sekolah / rotan) dalam dokumen kes.", "Guru Disiplin")
@@ -189,7 +193,8 @@ def next_steps(source: str, points: int, status: str, has_b02: bool) -> list[dic
             add("Peringkat 6: murid dinasihatkan berpindah sekolah.", "Guru Disiplin")
         add("Tidak — tamatkan kes.", "Guru Disiplin", "close")
     elif status == "MEETING":
-        add("Tandatangan Surat Akujanji (B08) jika berkaitan semasa pertemuan.", "Guru Disiplin")
+        if points >= 21:
+            add("Tandatangan Surat Akujanji (B08) semasa pertemuan.", "Guru Disiplin")
         if points >= 41:
             add("Peringkat 6: murid dinasihatkan berpindah sekolah.", "Guru Disiplin")
         add("Rekod butiran / hasil pertemuan dalam Kad SPSM (LAM/DIS/002-1) dan tutup kes.", "Guru Disiplin", "close")

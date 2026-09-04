@@ -1,0 +1,101 @@
+# Behavior Report — Simulated Disciplinary Cases (MITS SPSM)
+
+**Date:** 2026-09-04
+**Environment:** Development / testing only
+**Data source:** API simulation against the live database (PostgreSQL). **No emails were sent** — the simulation ran against a temporary API instance with `EMAIL_API`/`API_KEY` disabled.
+**Purpose:** Populate the system with realistic end-to-end cases so every role, status, and document flow can be reviewed before real use.
+
+---
+
+## 1. Roles exercised
+
+| Role | Account | Actions performed |
+|---|---|---|
+| `guru_biasa` | `guru_biasa@mits.edu.my` (dev) | File complaints (B01), fill B02 on own cases |
+| `guru_disiplin` | `guru_disiplin@mits.edu.my` (dev) | Review/reject kads (B03), investigate (B02), confirm, record (B04), ack (B05), prepare documents, approve, notify, meeting, close, dismiss, spot checks |
+| `pentadbir` | `pentadbir@mits.edu.my` (dev) | Sign B06 documents (`sign` action), create pengawas account |
+| `pengawas` | `pengawas@mits.edu.my` (local) | File Kad Peringatan (B03) |
+
+Login: `http://localhost:3000/login-dev` (dev-only page, password `dev123456`).
+
+---
+
+## 2. Simulated cases (20 total)
+
+### A. Aduan Guru (B01) — kes ringan (≤5 mata)
+| K- | Mata | Final status | Flow exercised |
+|---|---|---|---|
+| K-0100 | 2 | CLOSED | Recorded automatically → execute → close |
+| K-0101 | 5 | CLOSED | Recorded automatically → execute → close |
+
+### B. Aduan Guru (B01) — kes berat (6–50 mata)
+| K- | Mata | Final status | Flow exercised |
+|---|---|---|---|
+| K-0102 | 10 | CLOSED | **Full heavy path**: B02 filled by guru_biasa + **disemak** by guru_disiplin → confirm → record → ack (B05 auto) → B06 saved → prepare → approve → **sign (pentadbir)** → notify → meeting → close |
+| K-0103 | 10 | REPORTED | Left at queue **"Menunggu siasatan"** (B02 pending) |
+| K-0104 | 20 | CLOSED | Full path + **2 counselling sessions** (mandatory 11–40m before close) |
+| K-0105 | 20 | STUDENT_ACK | Left after ack (B05 recorded, waiting document prep) |
+| K-0106 | 30 | PRINCIPAL_APPROVAL | B06 **"Kedua"** + **B08 Surat Akujanji** saved; left at queue **"Menunggu tandatangan"** |
+| K-0107 | 40 | MEETING | Peringkat 5: **hukuman gantung asrama**, B06 **"Terakhir"**, B08, 1 counselling, meeting done; waiting close |
+| K-0108 | 45 | PARENT_NOTIFIED | Peringkat 6 (nasihat pindah sekolah); B06 Terakhir + B08; waiting meeting |
+| K-0109 | 15 | CLOSED | Full path + **B07 barang rampasan** (mercuon) + 1 counselling |
+| K-0110 | 10 | DISMISSED | Dismissed **after B02** (aduan tidak berasas) |
+| K-0111 | 10 | DISMISSED | Dismissed at REPORTED (before siasatan) |
+| K-0112 | 20 | RECORDED | **Two B02 forms** (guru_biasa + guru_disiplin); waiting B05 ack |
+| K-0113 | 10 | INVESTIGATING | B02 filled, waiting confirmation |
+
+### C. Spot Check
+| K- | Mata | Final status | Flow exercised |
+|---|---|---|---|
+| K-0114 | 5 | CLOSED | B02 **wajib walaupun ≤5 mata** → confirm → record → execute → close |
+| K-0115 | 10 | PRINCIPAL_APPROVAL | Full heavy path; left at "Menunggu tandatangan" |
+| K-0116 | 3 | REPORTED | Left at "Menunggu siasatan" |
+
+### D. Kad Peringatan (B03) — pengawas
+| K- | Mata | Final status | Flow exercised |
+|---|---|---|---|
+| K-0117 | 3 | CLOSED | `approveWarning` → record → execute → close |
+| K-0118 | 5 | DISMISSED | `rejectWarning` (kad ditolak) |
+| K-0119 | 4 | REPORTED | Left at queue **"Menunggu semakan"** |
+
+---
+
+## 3. Verified behaviour (deep checks)
+
+| Check | Result |
+|---|---|
+| B02 auto-fills `disediakanOleh` / `disediakanJawatan` / `disediakanTarikh` | ✔ (e.g. K-0102: "Dev Guru Disiplin · Guru disiplin") |
+| B02 `disemak` (review) endpoint | ✔ K-0102, K-0104… |
+| B05 auto-created on `ack` (with `acknowledged_by`) | ✔ all ack'd cases |
+| B06 / B07 / B08 saved via docs PATCH | ✔ K-0106 (B06+B08), K-0109 (B07), K-0107 (all) |
+| Counselling mandatory & recorded (11–40m) | ✔ K-0104 (2 sesi), K-0107, K-0109 |
+| Punishment Peringkat 5 (31–40m only) | ✔ K-0107 (gantung asrama) |
+| Meeting record | ✔ K-0102, K-0104, K-0107, K-0109 |
+| Multiple B02 on one case | ✔ K-0112 (2 forms) |
+| `sign` restricted to pentadbir | ✔ performed with pentadbir token |
+| Emails | Disabled — none sent |
+
+---
+
+## 4. What you'll see when you log in
+
+Start the stack (`npm run dev`) and log in via **/login-dev**:
+
+- **Guru Disiplin / Pentadbir dashboard** — live queues:
+  - "Menunggu semakan" (kad B03): K-0119
+  - "Menunggu siasatan" (B02): K-0103, K-0116
+  - "Menunggu tandatangan": K-0106, K-0115
+  - "Kes aktif": 10 kes
+- **/kes** — 20 cases across every status (CLOSED 7, DISMISSED 3, REPORTED 3, PRINCIPAL_APPROVAL 2, INVESTIGATING 1, STUDENT_ACK 1, RECORDED 1, MEETING 1, PARENT_NOTIFIED 1)
+- **Per-case**: "Tindakan seterusnya" precise per tier, Siasatan tab (B02 list + detail modal + "Tandakan disemak"), Dokumen tab (green ✓ reflects real records), Kronologi, print views (B01–B08, Kad SPSM) pre-filled
+- **/notifikasi** — timeline notifications generated by transitions
+- **Guru Biasa** — sees only own complaints (K-0100–K-0113)
+- **/rekod-b04** — recorded/executed cases register
+
+---
+
+## 5. Notes
+
+- All data was created on **2026-09-04** (today); seq numbering continues from K-0100.
+- Test data is **intentional** — delete manually when done (e.g. `uv run python scripts/clean_db.py`, then re-run `uv run python scripts/seed_dev_users.py`).
+- Dev-only components (dev login, seed script, `dev_users` table) are marked `DEV ONLY — DELETE AFTER TESTING`.

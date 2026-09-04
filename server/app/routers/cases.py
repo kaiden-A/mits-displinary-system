@@ -158,6 +158,12 @@ def add_b02(case_id: int, payload: B02In, db: Session = Depends(get_db), princip
     return B02Out(id=form.id, fill_by=form.fill_by, fill_role=form.fill_role, filled_at=form.filled_at, fields=form.fields)
 
 
+@router.post("/{case_id}/b02/{form_id}/review", response_model=B02Out)
+def review_b02(case_id: int, form_id: int, db: Session = Depends(get_db), principal: Principal = Depends(get_current_principal)):
+    form = cases_service.review_b02(db, case_id, form_id, principal)
+    return B02Out(id=form.id, fill_by=form.fill_by, fill_role=form.fill_role, filled_at=form.filled_at, fields=form.fields)
+
+
 @router.post("/{case_id}/transitions")
 def transition(case_id: int, payload: TransitionIn, db: Session = Depends(get_db), principal: Principal = Depends(get_current_principal)):
     case = cases_service.advance(db, case_id, payload.action, principal)
@@ -196,4 +202,5 @@ def steps(case_id: int, db: Session = Depends(get_db), principal: Principal = De
     if not cases_service.can_view_case(case, principal):
         raise HTTPException(status_code=403, detail="not your case")
     has_b02 = len(case.b02_forms) > 0
-    return workflow.next_steps(case.source, case.points, case.status, has_b02)
+    needs_b07 = any(o.code in {"D02", "D03", "J01", "J06", "L09", "L13", "L15"} for o in case.offences)
+    return workflow.next_steps(case.source, case.points, case.status, has_b02, needs_b07)

@@ -2,13 +2,28 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..auth import dev as dev_auth  # DEV ONLY — delete after testing
 from ..auth import pengawas as pw
 from ..database import get_db
 from ..dependencies import get_current_principal
-from ..models import PengawasAccount
+from ..models import DevUser, PengawasAccount  # DevUser DEV ONLY — delete after testing
 from ..schemas import PengawasLoginIn, Principal
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+# DEV ONLY — local staff login to simulate roles. DELETE AFTER TESTING.
+@router.post("/dev/login")
+def dev_login(payload: PengawasLoginIn, db: Session = Depends(get_db)):
+    user = db.scalar(select(DevUser).where(DevUser.email == payload.email.lower()))
+    if not user or not pw.verify_password(payload.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="invalid credentials")
+    token = dev_auth.create_dev_token(user)
+    return {
+        "token": token,
+        "expires_in": 8 * 60 * 60,
+        "user": {"name": user.full_name, "email": user.email, "roles": [user.role]},
+    }
 
 
 @router.post("/pengawas/login")

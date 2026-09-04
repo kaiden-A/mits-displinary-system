@@ -11,6 +11,13 @@ from . import email_service, workflow
 from .students_service import get_student
 
 MANAGER_ROLES = {"guru_disiplin", "pentadbir", "super_admin"}
+ROLE_LABELS = {
+    "guru_biasa": "Guru",
+    "guru_disiplin": "Guru disiplin",
+    "pentadbir": "Pentadbir",
+    "super_admin": "Super admin",
+    "pengawas": "Pengawas",
+}
 CASE_DOCUMENT_CODES = ("b01", "b03", "b05", "b06", "b07", "b08")
 RECORDED_SET = {
     "RECORDED", "STUDENT_ACK", "ACTION_PREPARED", "PRINCIPAL_APPROVAL",
@@ -188,13 +195,50 @@ def add_b02(db: Session, case_id: int, fields: dict, principal: Principal) -> B0
     if not set(principal.roles).intersection({"guru_biasa", "guru_disiplin", "pentadbir", "super_admin"}):
         raise HTTPException(status_code=403, detail="role may not fill B02")
 
-    form = B02Form(fill_by=principal.name, fill_role=principal_role(principal), fields=fields)
+    fill_role = principal_role(principal)
+    fields = dict(fields or {})
+    fields["disediakanOleh"] = principal.name
+    fields["disediakanJawatan"] = ROLE_LABELS.get(fill_role, fill_role)
+    fields["disediakanTarikh"] = datetime.now().date().isoformat()
+
+    form = B02Form(fill_by=principal.name, fill_role=fill_role, fields=fields)
     case.b02_forms.append(form)
     case.events.append(
         CaseEvent(
             text=f"Borang Siasatan (B02) diisi oleh {principal.name} ({form.fill_role}).",
             by_name=principal.name,
             by_role=form.fill_role,
+        )
+    )
+    db.commit()
+    db.refresh(form)
+    return form
+
+
+def review_b02(db: Session, case_id: int, form_id: int, principal: Principal) -> B02Form:
+    case = db.get(Case, case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail="case not found")
+    if not can_view_case(case, principal):
+        raise HTTPException(status_code=403, detail="not your case")
+    if not is_manager(principal):
+        raise HTTPException(status_code=403, detail="role may not review B02")
+
+    form = next((f for f in case.b02_forms if f.id == form_id), None)
+    if not form:
+        raise HTTPException(status_code=404, detail="B02 form not found")
+
+    fill_role = principal_role(principal)
+    fields = dict(form.fields or {})
+    fields["disemakOleh"] = principal.name
+    fields["disemakJawatan"] = ROLE_LABELS.get(fill_role, fill_role)
+    fields["disemakTarikh"] = datetime.now().date().isoformat()
+    form.fields = fields
+    case.events.append(
+        CaseEvent(
+            text=f"Borang Siasatan (B02-{form.id}) disemak oleh {principal.name} ({fill_role}).",
+            by_name=principal.name,
+            by_role=fill_role,
         )
     )
     db.commit()
@@ -236,9 +280,35 @@ def advance(db: Session, case_id: int, action: str, principal: Principal) -> Cas
         roles=("guru_disiplin", "pentadbir", "super_admin"),
         notify_reporter=True,
     )
+    if action == "ack":
+        _record_b05_acknowledgement(case, principal, actor_role)
     db.commit()
     db.refresh(case)
     return case
+
+
+def _record_b05_acknowledgement(case: Case, principal: Principal, actor_role: str) -> None:
+    """Auto-create the B05 (Pengakuan Murid) record when the acknowledgment
+    action is taken. The printed B05 is signed physically by the student and
+    two witnesses; this record captures the acknowledgment data and audit trail."""
+    doc = next((d for d in case.docs if d.doc_code == "b05"), None)
+    if doc is None:
+        doc = CaseDoc(doc_code="b05", data={})
+        case.docs.append(doc)
+    data = dict(doc.data or {})
+    data.setdefault("perbuatan", ", ".join(o.name for o in case.offences))
+    data.setdefault("tarikhPengakuan", datetime.now().date().isoformat())
+    data.setdefault("masaPengakuan", datetime.now().strftime("%H:%M"))
+    if not data.get("tempat"):
+        tempat = next(
+            (d.data.get("lokasi") for d in case.docs if d.doc_code == "b01" and isinstance(d.data, dict) and d.data.get("lokasi")),
+            "",
+        )
+        data["tempat"] = tempat
+    data["acknowledged_by"] = principal.name
+    data["acknowledged_role"] = actor_role
+    data["recorded_at"] = datetime.utcnow().isoformat()
+    doc.data = data
 
 
 def add_counselling_session(db: Session, case_id: int, session_fields: dict, principal: Principal) -> Case:

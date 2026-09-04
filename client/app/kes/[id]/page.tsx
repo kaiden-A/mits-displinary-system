@@ -7,5 +7,5 @@ export default async function CasePage({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const session = await getSession();
   if (!session) return null;
-  return <CaseWorkspace id={id} roles={session.roles} authType={session.authType} />;
+  return <CaseWorkspace id={id} roles={session.roles} authType={session.authType} name={session.name} />;
 }

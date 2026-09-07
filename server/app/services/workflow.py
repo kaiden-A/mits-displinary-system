@@ -1,3 +1,5 @@
+from ..roles import ADMIN_ROLE_ORDER, MANAGER_ROLE_ORDER
+
 STATUSES = [
     {"id": "REPORTED", "label": "Dilaporkan / Menunggu Semakan"},
     {"id": "INVESTIGATING", "label": "Dalam Siasatan"},
@@ -18,72 +20,72 @@ TRANSITIONS = {
     "startInvestigation": {
         "from": ["REPORTED"], "to": "INVESTIGATING",
         "text": "Siasatan dimulakan — Borang Siasatan (B02) disediakan.",
-        "roles": ["guru_disiplin", "pentadbir", "super_admin"],
+        "roles": list(MANAGER_ROLE_ORDER),
     },
     "confirm": {
         "from": ["INVESTIGATING"], "to": "CONFIRMED",
         "text": "Aduan disahkan berasas.",
-        "roles": ["guru_disiplin", "pentadbir", "super_admin"],
+        "roles": list(MANAGER_ROLE_ORDER),
     },
     "dismiss": {
         "from": ["REPORTED", "INVESTIGATING"], "to": "DISMISSED",
         "text": "Kes ditolak / didapati tidak berasas.",
-        "roles": ["guru_disiplin", "pentadbir", "super_admin"],
+        "roles": list(MANAGER_ROLE_ORDER),
     },
     "approveWarning": {
         "from": ["REPORTED"], "src": ["PREFECT_WARNING"], "to": "RECORDED",
         "text": "Kad Peringatan disemak dan disahkan — kesalahan direkod dalam B04 (Buku Rekod Disiplin).",
-        "roles": ["guru_disiplin", "pentadbir", "super_admin"],
+        "roles": list(MANAGER_ROLE_ORDER),
     },
     "rejectWarning": {
         "from": ["REPORTED"], "src": ["PREFECT_WARNING"], "to": "DISMISSED",
         "text": "Kad Peringatan ditolak.",
-        "roles": ["guru_disiplin", "pentadbir", "super_admin"],
+        "roles": list(MANAGER_ROLE_ORDER),
     },
     "record": {
         "from": ["REPORTED", "CONFIRMED"], "to": "RECORDED",
         "text": "Kesalahan direkod dalam Buku Rekod Disiplin (B04).",
-        "roles": ["guru_disiplin", "pentadbir", "super_admin"],
+        "roles": list(MANAGER_ROLE_ORDER),
     },
     "ack": {
         "from": ["RECORDED"], "to": "STUDENT_ACK",
         "text": "Murid mengisi Borang Pengakuan Murid (B05).",
-        "roles": ["guru_disiplin", "pentadbir", "super_admin"],
+        "roles": list(MANAGER_ROLE_ORDER),
     },
     "prepare": {
         "from": ["STUDENT_ACK"], "to": "ACTION_PREPARED",
         "text": "Kad SPSM dan surat-surat (B06 / B08) disediakan.",
-        "roles": ["guru_disiplin", "pentadbir", "super_admin"],
+        "roles": list(MANAGER_ROLE_ORDER),
     },
     "approve": {
         "from": ["ACTION_PREPARED"], "to": "PRINCIPAL_APPROVAL",
         "text": "Dihantar untuk tandatangan Pentadbir.",
-        "roles": ["guru_disiplin", "pentadbir", "super_admin"],
+        "roles": list(MANAGER_ROLE_ORDER),
     },
     "sign": {
         "from": ["PRINCIPAL_APPROVAL"], "to": "EXECUTED",
         "text": "Pentadbir menandatangani Surat Pemberitahuan / Amaran (B06).",
-        "roles": ["pentadbir", "super_admin"],
+        "roles": list(ADMIN_ROLE_ORDER),
     },
     "execute": {
         "from": ["RECORDED"], "to": "EXECUTED",
         "text": "Badan Disiplin melaksanakan hukuman / tindakan merujuk Modul SPSM.",
-        "roles": ["guru_disiplin", "pentadbir", "super_admin"],
+        "roles": list(MANAGER_ROLE_ORDER),
     },
     "notify": {
         "from": ["EXECUTED"], "to": "PARENT_NOTIFIED",
         "text": "Surat dihantar kepada ibu bapa / penjaga (serahan tangan / pos; telefon jika perlu tindakan segera).",
-        "roles": ["guru_disiplin", "pentadbir", "super_admin"],
+        "roles": list(MANAGER_ROLE_ORDER),
     },
     "meeting": {
         "from": ["PARENT_NOTIFIED"], "to": "MEETING",
         "text": "Ibu bapa / penjaga dipanggil — pertemuan diadakan.",
-        "roles": ["guru_disiplin", "pentadbir", "super_admin"],
+        "roles": list(MANAGER_ROLE_ORDER),
     },
     "close": {
         "from": ["PARENT_NOTIFIED", "EXECUTED", "MEETING"], "to": "CLOSED",
         "text": "Hasil pertemuan direkod dalam Kad SPSM (LAM/DIS/002-1). Kes ditutup.",
-        "roles": ["guru_disiplin", "pentadbir", "super_admin"],
+        "roles": list(MANAGER_ROLE_ORDER),
     },
 }
 

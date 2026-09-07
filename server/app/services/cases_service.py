@@ -5,12 +5,12 @@ from sqlalchemy import false, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from ..models import B02Form, Case, CaseDoc, CaseEvent, CaseOffence, Notification
+from ..roles import GURU_BIASA, MANAGER_ROLES, MANAGER_ROLE_ORDER, PENGAWAS, STAFF_ROLES, SUPER_ADMIN
 from ..schemas import CaseCreate, Principal
 from ..seed import prefect_allowed
 from . import email_service, workflow
 from .students_service import get_student
 
-MANAGER_ROLES = {"guru_disiplin", "pentadbir", "super_admin"}
 ROLE_LABELS = {
     "guru_biasa": "Guru",
     "guru_disiplin": "Guru disiplin",
@@ -114,17 +114,17 @@ def create_case(db: Session, payload: CaseCreate, principal: Principal) -> Case:
         raise HTTPException(status_code=404, detail="student not found in cache (run /students/sync)")
 
     if payload.source == "PREFECT_WARNING":
-        if "pengawas" not in principal.roles and "super_admin" not in principal.roles:
+        if PENGAWAS not in principal.roles and SUPER_ADMIN not in principal.roles:
             raise HTTPException(status_code=403, detail="only pengawas / super_admin may file B03")
         points = _validate_prefect(payload.offences)
         status = "REPORTED"
     elif payload.source == "COMPLAINT":
-        if not set(principal.roles).intersection({"guru_biasa", "guru_disiplin", "pentadbir", "super_admin"}):
+        if not set(principal.roles).intersection(STAFF_ROLES):
             raise HTTPException(status_code=403, detail="role may not file B01")
         points = _validate_offences(db, payload.offences)
         status = "RECORDED" if points <= 5 else "REPORTED"
     else:  # SPOT_CHECK
-        if not set(principal.roles).intersection({"guru_disiplin", "pentadbir", "super_admin"}):
+        if not set(principal.roles).intersection(MANAGER_ROLES):
             raise HTTPException(status_code=403, detail="only discipline staff may file spot check")
         points = _validate_offences(db, payload.offences)
         status = "REPORTED"
@@ -165,7 +165,7 @@ def create_case(db: Session, payload: CaseCreate, principal: Principal) -> Case:
         case,
         "CASE_CREATED",
         f"Kes baharu K-{case.seq} telah diwujudkan ({case.status}).",
-        roles=("guru_disiplin", "pentadbir", "super_admin"),
+        roles=MANAGER_ROLE_ORDER,
     )
     db.commit()
     db.refresh(case)
@@ -192,7 +192,7 @@ def add_b02(db: Session, case_id: int, fields: dict, principal: Principal) -> B0
         raise HTTPException(status_code=422, detail="case does not require B02")
     if case.status not in {"REPORTED", "INVESTIGATING"}:
         raise HTTPException(status_code=422, detail="B02 may only be added while case is reported or investigating")
-    if not set(principal.roles).intersection({"guru_biasa", "guru_disiplin", "pentadbir", "super_admin"}):
+    if not set(principal.roles).intersection(STAFF_ROLES):
         raise HTTPException(status_code=403, detail="role may not fill B02")
 
     fill_role = principal_role(principal)
@@ -292,7 +292,7 @@ def advance(db: Session, case_id: int, action: str, principal: Principal) -> Cas
         case,
         "CASE_TRANSITION",
         f"Kes K-{case.seq}: {text}",
-        roles=("guru_disiplin", "pentadbir", "super_admin"),
+        roles=MANAGER_ROLE_ORDER,
         notify_reporter=True,
     )
     if action == "ack":
@@ -390,7 +390,7 @@ def patch_doc(db: Session, case_id: int, doc_code: str, data: dict, principal: P
         raise HTTPException(status_code=404, detail="case not found")
     if not can_view_case(case, principal):
         raise HTTPException(status_code=403, detail="not your case")
-    if not set(principal.roles).intersection({"guru_disiplin", "pentadbir", "super_admin"}):
+    if not set(principal.roles).intersection(MANAGER_ROLES):
         raise HTTPException(status_code=403, detail="role may not edit case documents")
     doc = next((d for d in case.docs if d.doc_code == doc_code), None)
     if doc is None:
@@ -427,7 +427,7 @@ def patch_meeting(db: Session, case_id: int, meeting: dict, principal: Principal
 def can_view_case(case: Case, principal: Principal) -> bool:
     if is_manager(principal):
         return True
-    if "guru_biasa" in principal.roles:
+    if GURU_BIASA in principal.roles:
         return case.reporter_sub == principal.sub
     return False
 
@@ -438,7 +438,7 @@ def case_visible_query(principal: Principal):
 
     if is_manager(principal):
         return select(CaseModel)
-    if "guru_biasa" in principal.roles:
+    if GURU_BIASA in principal.roles:
         return select(CaseModel).where(CaseModel.reporter_sub == principal.sub)
     return select(CaseModel).where(false())
 

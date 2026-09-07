@@ -7,6 +7,7 @@ from ..auth import pengawas as pw
 from ..database import get_db
 from ..dependencies import get_current_principal
 from ..models import DevUser, PengawasAccount  # DevUser DEV ONLY — delete after testing
+from ..roles import PENGAWAS
 from ..schemas import PengawasLoginIn, Principal
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -43,7 +44,7 @@ def pengawas_login(payload: PengawasLoginIn, db: Session = Depends(get_db)):
         "token": token,
         "expires_in": 60 * 15,
         "session_minutes": 15,
-        "user": {"name": account.full_name, "email": account.email, "role": "pengawas"},
+        "user": {"name": account.full_name, "email": account.email, "role": PENGAWAS},
     }
 
 

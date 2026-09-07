@@ -5,13 +5,14 @@ from sqlalchemy.orm import Session, selectinload
 from ..database import get_db
 from ..dependencies import get_current_principal, require_roles
 from ..models import Case, StudentCache
+from ..roles import MANAGER_ROLES
 from ..schemas import Principal, StudentListOut, StudentOut, StudentSummaryOut
 from ..services import cases_service, students_service
 from .cases import _to_out
 
 router = APIRouter(prefix="/students", tags=["students"])
 
-sync_students = require_roles("guru_disiplin", "pentadbir", "super_admin")
+sync_students = require_roles(*MANAGER_ROLES)
 
 
 def _student_out(student: StudentCache, principal: Principal) -> StudentOut:

@@ -1,6 +1,5 @@
 import { ROLES, type Session } from "@/lib/auth";
-
-const MANAGER_ROLES = [ROLES.guruDisiplin, ROLES.pentadbir, ROLES.superAdmin];
+import { ADMIN_ROLES, MANAGER_ROLES, STAFF_ROLES } from "@/lib/roles";
 
 export function hasAny(session: Pick<Session, "roles"> | null, roles: string[]): boolean {
   if (!session) return false;
@@ -12,7 +11,7 @@ export function isManager(session: Session | null): boolean {
 }
 
 export function isAdministrator(session: Session | null): boolean {
-  return hasAny(session, [ROLES.pentadbir, ROLES.superAdmin]);
+  return hasAny(session, ADMIN_ROLES);
 }
 
 /** Port of sample canAct — who may perform a workflow action. */
@@ -26,7 +25,7 @@ const ACTION_ROLES: Record<string, string[]> = {
   ack: MANAGER_ROLES,
   prepare: MANAGER_ROLES,
   approve: MANAGER_ROLES,
-  sign: [ROLES.pentadbir, ROLES.superAdmin],
+  sign: ADMIN_ROLES,
   execute: MANAGER_ROLES,
   notify: MANAGER_ROLES,
   meeting: MANAGER_ROLES,
@@ -45,7 +44,7 @@ export function canAccessRoute(session: Session | null, pathname: string): boole
 
   if (session.authType === "pengawas") return view === "kad";
   if (view === "kad") return hasAny(session, [ROLES.superAdmin]);
-  if (view === "aduan") return hasAny(session, [ROLES.guruBiasa, ROLES.guruDisiplin, ROLES.pentadbir, ROLES.superAdmin]);
+  if (view === "aduan") return hasAny(session, STAFF_ROLES);
   if (view === "spot-check" || view === "murid" || view === "rekod-b04") return isManager(session);
   if (view === "pengawas-accounts") return isAdministrator(session);
   if (view === "dashboard") return isManager(session);
@@ -58,7 +57,7 @@ export function canAccessRoute(session: Session | null, pathname: string): boole
 export function visibleDocs(session: Session | null, caseData: { points: number; source: string }): string[] {
   if (!session) return [];
   if (session.authType === "pengawas") return ["b03"];
-  if (hasAny(session, [ROLES.guruDisiplin, ROLES.pentadbir, ROLES.superAdmin])) {
+  if (hasAny(session, MANAGER_ROLES)) {
     const docs = ["b01", "b04", "kad"];
     const needsB02 = caseData.source === "SPOT_CHECK" || (caseData.source === "COMPLAINT" && caseData.points > 5);
     if (needsB02) docs.splice(1, 0, "b02");

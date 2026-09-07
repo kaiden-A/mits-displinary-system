@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from ..database import get_db
 from ..dependencies import get_current_principal
+from ..roles import MANAGER_ROLES
 from ..schemas import (
     B02In,
     B02Out,
@@ -137,7 +138,7 @@ def list_cases(
 
 @router.get("/recorded")
 def recorded_register(db: Session = Depends(get_db), principal: Principal = Depends(get_current_principal)):
-    if not set(principal.roles).intersection({"guru_disiplin", "pentadbir", "super_admin"}):
+    if not set(principal.roles).intersection(MANAGER_ROLES):
         raise HTTPException(status_code=403, detail="B04 register is for discipline staff")
     return [_to_out(c, principal) for c in cases_service.recorded_cases(db)]
 

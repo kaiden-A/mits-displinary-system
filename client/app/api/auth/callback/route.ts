@@ -8,6 +8,7 @@ import {
   SESSION_COOKIE,
   verifyIdToken,
 } from "@/lib/auth-oidc";
+import { STAFF_ROLES } from "@/lib/roles";
 
 function redirectToLogin(request: NextRequest, error: string) {
   const response = NextResponse.redirect(new URL(`/login?error=${error}`, request.nextUrl));
@@ -75,8 +76,7 @@ export async function GET(request: NextRequest) {
   const idTokenRoles = extractRoles(claims as Record<string, unknown>);
   const userinfoRoles = await fetchUserinfoRoles(tokens.access_token);
   const roles = [...new Set([...idTokenRoles, ...userinfoRoles])];
-  const spsmRoles = ["guru_biasa", "guru_disiplin", "pentadbir", "super_admin"];
-  const allowedRoles = roles.filter((role) => spsmRoles.includes(role));
+  const allowedRoles = roles.filter((role) => STAFF_ROLES.includes(role));
   if (!allowedRoles.length) {
     console.error("[auth] DEBUG forbidden_role", JSON.stringify({
       sub: (claims as Record<string, unknown>).sub,

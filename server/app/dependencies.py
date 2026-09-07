@@ -6,11 +6,10 @@ from .auth.dev import DEV_SUB_PREFIX  # DEV ONLY — delete after testing
 from .auth.pengawas import PW_SUB_PREFIX, decode_session_token
 from .auth.zitadel import validate_staff_token
 from .database import get_db
+from .roles import PENGAWAS, STAFF_ROLES
 from .schemas import Principal
 
 bearer_scheme = HTTPBearer(auto_error=False)
-
-STAFF_ROLES = {"guru_biasa", "guru_disiplin", "pentadbir", "super_admin"}
 
 
 def get_current_principal(
@@ -30,7 +29,7 @@ def get_current_principal(
                 sub=str(pengawas_claims["sub"]),
                 name=str(pengawas_claims.get("name") or ""),
                 email=str(pengawas_claims.get("email") or ""),
-                roles=["pengawas"],
+                roles=[PENGAWAS],
             )
     except Exception:
         pass

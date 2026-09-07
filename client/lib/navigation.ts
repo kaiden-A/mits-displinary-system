@@ -1,4 +1,5 @@
 import type { Session } from "@/lib/auth";
+import { ADMIN_ROLES, MANAGER_ROLES, ROLES } from "@/lib/roles";
 
 export type IconName =
   | "arrowLeft" | "archive" | "bell" | "book" | "calendar" | "check" | "chevronDown" | "chevronRight"
@@ -30,7 +31,7 @@ export function navigationFor(session: Pick<Session, "authType" | "roles">): Nav
   const roles = new Set(session.roles);
   const groups: NavGroup[] = [];
 
-  if (roles.has("guru_biasa") && !["guru_disiplin", "pentadbir", "super_admin"].some((role) => roles.has(role))) {
+  if (roles.has(ROLES.guruBiasa) && !MANAGER_ROLES.some((role) => roles.has(role))) {
     groups.push({ label: "Urusan saya", items: [
       { href: "/aduan", label: "Buat aduan", description: "Laporkan salah laku murid", icon: "pen" },
       { href: "/kes", label: "Aduan saya", description: "Jejak aduan yang dihantar", icon: "folder" },
@@ -48,7 +49,7 @@ export function navigationFor(session: Pick<Session, "authType" | "roles">): Nav
     { href: "/notifikasi", label: "Notifikasi", description: "Pemberitahuan sistem", icon: "bell" },
   ] });
 
-  if (roles.has("pentadbir") || roles.has("super_admin")) {
+  if (ADMIN_ROLES.some((role) => roles.has(role))) {
     groups.push({ label: "Pentadbiran", items: [
       { href: "/pengawas-accounts", label: "Akaun pengawas", description: "Urus akaun kiosk", icon: "key" },
     ] });

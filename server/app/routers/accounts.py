@@ -9,6 +9,7 @@ from ..config import settings
 from ..database import get_db
 from ..dependencies import require_roles
 from ..models import PengawasAccount
+from ..roles import ADMIN_ROLES
 from ..schemas import (
     LockPengawasIn,
     PengawasAccountCreate,
@@ -19,7 +20,7 @@ from ..schemas import (
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
 
-manage_accounts = require_roles("pentadbir", "super_admin")
+manage_accounts = require_roles(*ADMIN_ROLES)
 
 
 @router.get("/pengawas", response_model=list[PengawasAccountOut])

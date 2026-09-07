@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..models import PengawasAccount
+from ..roles import PENGAWAS
 
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
@@ -29,7 +30,7 @@ def create_session_token(account: PengawasAccount) -> str:
     return jwt.encode(
         {
             "sub": f"{PW_SUB_PREFIX}{account.id}",
-            "role": "pengawas",
+            "role": PENGAWAS,
             "name": account.full_name,
             "email": account.email,
             "exp": expires,

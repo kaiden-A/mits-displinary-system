@@ -1,18 +1,14 @@
 import { jwtVerify } from "jose";
 
+import { ROLES } from "@/lib/roles";
+
+export { ROLES } from "@/lib/roles";
+
 const SESSION_SECRET = new TextEncoder().encode(process.env.NEXTAUTH_SECRET!);
 const PW_SECRET = new TextEncoder().encode(process.env.APP_SECRET!);
 
 export const SESSION_COOKIE = "session";
 export const PW_COOKIE = "pw_session";
-
-export const ROLES = {
-  guruBiasa: "guru_biasa",
-  pengawas: "pengawas",
-  guruDisiplin: "guru_disiplin",
-  pentadbir: "pentadbir",
-  superAdmin: "super_admin",
-} as const;
 
 export interface StaffSession {
   authType: "staff";
@@ -61,7 +57,7 @@ async function decodePengawas(token: string): Promise<PengawasSession | null> {
       name: (payload.name as string) || "",
       email: (payload.email as string) || "",
       expires_at: (payload.exp as number) || 0,
-      roles: ["pengawas"],
+      roles: [ROLES.pengawas],
     };
   } catch {
     return null;

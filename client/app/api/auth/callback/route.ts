@@ -72,6 +72,17 @@ export async function GET(request: NextRequest) {
     roles: allowedRoles,
   });
 
+  // Best-effort shadow-profile sync — never blocks login on a profile write.
+  try {
+    await fetch(`${process.env.API_URL || "http://localhost:8000"}/users/sync`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${tokens.access_token}` },
+      cache: "no-store",
+    });
+  } catch {
+    /* ignore — profile syncs again on next login */
+  }
+
   const response = NextResponse.redirect(new URL("/dashboard", request.nextUrl));
   response.cookies.set(SESSION_COOKIE, sessionToken, {
     httpOnly: true,

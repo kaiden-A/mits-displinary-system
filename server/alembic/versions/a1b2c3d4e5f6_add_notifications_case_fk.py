@@ -11,7 +11,7 @@ from alembic import op
 
 
 revision: str = 'a1b2c3d4e5f6'
-down_revision: Union[str, None] = 'e5b81bacc6f9'
+down_revision: Union[str, None] = 'eef329e83923'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

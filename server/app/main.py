@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
-from .routers import accounts, auth, cases, notifications, offences, students
+from .routers import accounts, auth, cases, notifications, offences, students, users
 
 app = FastAPI(title="MITS SPSM API", version="0.1.0")
 
@@ -20,6 +20,7 @@ app.include_router(students.router)
 app.include_router(offences.router)
 app.include_router(cases.router)
 app.include_router(notifications.router)
+app.include_router(users.router)
 
 
 @app.get("/health")

@@ -8,6 +8,7 @@ from .case import (
 )
 from .dev_user import DevUser  # DEV ONLY — delete after testing
 from .pengawas import PengawasAccount
+from .staff_user import StaffUser
 from .student import StudentCache
 
 __all__ = [
@@ -19,5 +20,6 @@ __all__ = [
     "Notification",
     "DevUser",  # DEV ONLY — delete after testing
     "PengawasAccount",
+    "StaffUser",
     "StudentCache",
 ]

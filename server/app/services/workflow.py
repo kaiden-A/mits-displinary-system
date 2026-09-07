@@ -1,4 +1,5 @@
 from ..roles import ADMIN_ROLE_ORDER, MANAGER_ROLE_ORDER
+from ..seed import needs_b02, tier_for
 
 STATUSES = [
     {"id": "REPORTED", "label": "Dilaporkan / Menunggu Semakan"},
@@ -89,27 +90,6 @@ TRANSITIONS = {
     },
 }
 
-HEAVY_PATH = [
-    "STUDENT_ACK", "ACTION_PREPARED", "PRINCIPAL_APPROVAL",
-    "EXECUTED", "PARENT_NOTIFIED", "MEETING", "CLOSED",
-]
-LIGHT_PATH = ["EXECUTED", "CLOSED"]
-
-
-def needs_b02(source: str, points: int) -> bool:
-    return source == "SPOT_CHECK" or (source == "COMPLAINT" and points > 5)
-
-
-def path_for(source: str, points: int) -> list[str]:
-    if needs_b02(source, points):
-        path = ["REPORTED", "INVESTIGATING", "CONFIRMED", "RECORDED"]
-    else:
-        path = ["REPORTED", "RECORDED"]
-    # Peringkat 2 (6+ mata): B05, B06, hubungi ibu bapa — full path. Peringkat 1: light.
-    path.extend(HEAVY_PATH if points >= 6 else LIGHT_PATH)
-    return path
-
-
 def can_act(roles: list[str], action: str) -> bool:
     transition = TRANSITIONS.get(action)
     if not transition:
@@ -140,6 +120,7 @@ def status_label(status: str) -> str:
 
 def next_steps(source: str, points: int, status: str, has_b02: bool, needs_b07: bool = False) -> list[dict]:
     """Port of the sample's nextSteps guidance."""
+    tier = tier_for(points)["tier"]
     steps: list[dict] = []
 
     def add(text: str, actor: str = "", action: str = "") -> None:
@@ -150,7 +131,7 @@ def next_steps(source: str, points: int, status: str, has_b02: bool, needs_b07: 
             add("Semak butiran Kad Peringatan dan kesalahan murid.", "Guru Disiplin")
             add("Sahkan — kesalahan direkod dalam B04.", "Guru Disiplin", "approveWarning")
             add("Tolak — kad tidak diterima.", "Guru Disiplin", "rejectWarning")
-        elif source == "COMPLAINT" and points > 5:
+        elif source == "COMPLAINT" and needs_b02(source, points):
             add("Isi Borang Siasatan (B02) — boleh diisi oleh guru pengadu atau Guru Disiplin.", "Guru / Guru Disiplin")
             add("Buka siasatan untuk kesalahan melebihi 5 mata.", "Guru Disiplin", "startInvestigation")
         elif source == "COMPLAINT":
@@ -164,40 +145,40 @@ def next_steps(source: str, points: int, status: str, has_b02: bool, needs_b07: 
     elif status == "CONFIRMED":
         add("Rekod kesalahan dalam Buku Rekod Disiplin (B04).", "Guru Disiplin", "record")
     elif status == "RECORDED":
-        if points >= 6:
+        if tier >= 2:
             add("Murid mengisi Borang Pengakuan Murid (B05) — wajib bagi 6 mata dan ke atas.", "Guru Disiplin", "ack")
         else:
             add("Laksanakan tindakan mengikut Modul SPSM: amaran bertulis + tarbiah / khidmat sosial.", "Badan Disiplin", "execute")
-        if 11 <= points <= 40:
+        if 3 <= tier <= 5:
             add("Murid menghadiri sesi kaunseling — rekod setiap sesi dalam dokumen kes (wajib sebelum tutup kes).", "Guru Disiplin")
     elif status == "STUDENT_ACK":
         add("Isi Kad SPSM (LAM/DIS/002-1).", "Guru Disiplin")
         add("Sediakan Surat Pemberitahuan / Amaran (B06).", "Guru Disiplin", "prepare")
-        if points >= 21:
+        if tier >= 4:
             add("Sediakan Surat Akujanji (B08).", "Guru Disiplin")
         if needs_b07:
             add("Sediakan Borang Barang Rampasan (B07).", "Guru Disiplin")
     elif status == "ACTION_PREPARED":
-        if 31 <= points <= 40:
+        if tier == 5:
             add("Rekod hukuman Peringkat 5 (gantung asrama / gantung sekolah / rotan) dalam dokumen kes.", "Guru Disiplin")
         add("Hantar surat untuk tandatangan Pentadbir.", "Guru Disiplin", "approve")
     elif status == "PRINCIPAL_APPROVAL":
         add("Tandatangani Surat Pemberitahuan / Amaran (B06) kepada ibu bapa / penjaga.", "Pentadbir", "sign")
     elif status == "EXECUTED":
-        if points >= 6:
+        if tier >= 2:
             add("Hantar surat secara serahan tangan / pos (makluman melalui telefon jika perlu tindakan segera).", "Guru Disiplin", "notify")
         else:
             add("Kes ringan selesai — tamatkan kes.", "Guru Disiplin", "close")
     elif status == "PARENT_NOTIFIED":
         add("Ibu bapa / penjaga dipanggil?", "Guru Disiplin")
         add("Ya — buat pertemuan dengan ibu bapa / penjaga.", "Guru Disiplin", "meeting")
-        if points >= 41:
+        if tier == 6:
             add("Peringkat 6: murid dinasihatkan berpindah sekolah.", "Guru Disiplin")
         add("Tidak — tamatkan kes.", "Guru Disiplin", "close")
     elif status == "MEETING":
-        if points >= 21:
+        if tier >= 4:
             add("Tandatangan Surat Akujanji (B08) semasa pertemuan.", "Guru Disiplin")
-        if points >= 41:
+        if tier == 6:
             add("Peringkat 6: murid dinasihatkan berpindah sekolah.", "Guru Disiplin")
         add("Rekod butiran / hasil pertemuan dalam Kad SPSM (LAM/DIS/002-1) dan tutup kes.", "Guru Disiplin", "close")
     else:

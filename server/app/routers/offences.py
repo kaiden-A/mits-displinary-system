@@ -10,7 +10,7 @@ router = APIRouter(tags=["catalogue"])
 @router.get("/offences", response_model=list[OffenceOut])
 def list_offences(_: Principal = Depends(get_current_principal)):
     return [
-        OffenceOut(code=r[0], name=r[2], min_points=r[3], max_points=r[4], action=r[5])
+        OffenceOut(code=r.code, name=r.name, min_points=r.min_points, max_points=r.max_points, action=r.action)
         for r in OFFENCES
     ]
 
@@ -18,7 +18,7 @@ def list_offences(_: Principal = Depends(get_current_principal)):
 @router.get("/offences/prefect-allowed", response_model=list[OffenceOut])
 def prefect_offences(_: Principal = Depends(get_current_principal)):
     return [
-        OffenceOut(code=r[0], name=r[2], min_points=r[3], max_points=r[4], action=r[5])
+        OffenceOut(code=r.code, name=r.name, min_points=r.min_points, max_points=r.max_points, action=r.action)
         for r in prefect_allowed()
     ]
 

@@ -21,7 +21,7 @@ from ..schemas import (
 )
 from ..services import cases_service, workflow
 from ..services.students_service import mask_ic_number
-from ..seed import tier_for
+from ..seed import case_doc_requirements, involves_confiscation, path_for, tier_for
 
 router = APIRouter(prefix="/cases", tags=["cases"])
 
@@ -45,6 +45,7 @@ def _structured_docs(case) -> dict[str, dict | None]:
 
 def _to_detail(case, principal: Principal | None = None) -> CaseDetailOut:
     structured = _structured_docs(case)
+    tier = tier_for(case.points)
     return CaseDetailOut(
         id=case.id,
         seq=case.seq,
@@ -64,15 +65,17 @@ def _to_detail(case, principal: Principal | None = None) -> CaseDetailOut:
         events=[CaseEventOut(ts=e.ts, text=e.text, by_name=e.by_name, by_role=e.by_role) for e in case.events],
         b02_forms=[B02Out(id=f.id, fill_by=f.fill_by, fill_role=f.fill_role, filled_at=f.filled_at, fields=f.fields) for f in case.b02_forms],
         docs=[CaseDocOut(doc_code=d.doc_code, data=d.data) for d in case.docs],
-        tier=tier_for(case.points)["tier"],
-        tier_label=tier_for(case.points)["label"],
+        tier=tier["tier"],
+        tier_label=tier["label"],
         counselling=case.counselling or [],
         punishment=case.punishment,
+        path=path_for(case.source, case.points),
         **structured,
     )
 
 
 def _to_out(case, principal: Principal | None = None) -> CaseOut:
+    tier = tier_for(case.points)
     return CaseOut(
         id=case.id,
         seq=case.seq,
@@ -89,8 +92,8 @@ def _to_out(case, principal: Principal | None = None) -> CaseOut:
         created_at=case.created_at,
         updated_at=case.updated_at,
         offences=[OffenceIn(code=o.code, name=o.name, points=o.points) for o in case.offences],
-        tier=tier_for(case.points)["tier"],
-        tier_label=tier_for(case.points)["label"],
+        tier=tier["tier"],
+        tier_label=tier["label"],
         counselling=case.counselling or [],
         punishment=case.punishment,
     )
@@ -202,6 +205,17 @@ def steps(case_id: int, db: Session = Depends(get_db), principal: Principal = De
         raise HTTPException(status_code=404, detail="case not found")
     if not cases_service.can_view_case(case, principal):
         raise HTTPException(status_code=403, detail="not your case")
-    has_b02 = len(case.b02_forms) > 0
-    needs_b07 = any(o.code in {"D02", "D03", "J01", "J06", "L09", "L13", "L15"} for o in case.offences)
-    return workflow.next_steps(case.source, case.points, case.status, has_b02, needs_b07)
+    return {
+        "steps": workflow.next_steps(
+            case.source,
+            case.points,
+            case.status,
+            len(case.b02_forms) > 0,
+            any(involves_confiscation(o.code) for o in case.offences),
+        ),
+        "required_docs": case_doc_requirements(
+            case.source,
+            case.points,
+            [o.code for o in case.offences],
+        ),
+    }

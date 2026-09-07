@@ -52,26 +52,3 @@ export function canAccessRoute(session: Session | null, pathname: string): boole
   if (view === "login" || view === "login-pengawas") return false;
   return true;
 }
-
-/** Port of sample visibleDocs — document print/edit visibility per role. */
-export function visibleDocs(session: Session | null, caseData: { points: number; source: string }): string[] {
-  if (!session) return [];
-  if (session.authType === "pengawas") return ["b03"];
-  if (hasAny(session, MANAGER_ROLES)) {
-    const docs = ["b01", "b04", "kad"];
-    const needsB02 = caseData.source === "SPOT_CHECK" || (caseData.source === "COMPLAINT" && caseData.points > 5);
-    if (needsB02) docs.splice(1, 0, "b02");
-    if (caseData.source === "PREFECT_WARNING") docs.splice(1, 0, "b03");
-    if (caseData.points >= 6) {
-      docs.push("b05", "b06");
-      if (caseData.points >= 21) docs.push("b08");
-    }
-    return docs;
-  }
-  if (session.roles.includes(ROLES.guruBiasa)) {
-    const docs = ["b01"];
-    if (caseData.source === "COMPLAINT" && caseData.points > 5) docs.push("b02");
-    return docs;
-  }
-  return [];
-}

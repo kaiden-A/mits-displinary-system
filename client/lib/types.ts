@@ -51,6 +51,7 @@ export interface CaseDetail extends CaseSummary {
   events: CaseEvent[];
   b02_forms: B02Form[];
   docs: CaseDoc[];
+  path: string[];
   b01?: Record<string, unknown> | null;
   b03?: Record<string, unknown> | null;
   b05?: Record<string, unknown> | null;
@@ -96,4 +97,10 @@ export interface CaseStep {
   text: string;
   actor: string;
   action: string;
+}
+
+export interface RequiredDoc {
+  id: string;
+  code: string;
+  name: string;
 }

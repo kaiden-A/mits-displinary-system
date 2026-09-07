@@ -93,6 +93,7 @@ class CaseDetailOut(CaseOut):
     events: list[CaseEventOut]
     b02_forms: list[B02Out]
     docs: list[CaseDocOut]
+    path: list[str] = Field(default_factory=list)
     b01: dict[str, Any] | None = None
     b03: dict[str, Any] | None = None
     b05: dict[str, Any] | None = None

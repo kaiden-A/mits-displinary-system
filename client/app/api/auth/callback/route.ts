@@ -16,24 +16,6 @@ function redirectToLogin(request: NextRequest, error: string) {
   return response;
 }
 
-function peekPayload(token: string): Record<string, unknown> {
-  try {
-    const part = token.split(".")[1];
-    if (!part) return {};
-    const pad = part.replace(/-/g, "+").replace(/_/g, "/");
-    return JSON.parse(Buffer.from(pad.padEnd(Math.ceil(pad.length / 4) * 4, "="), "base64").toString("utf8"));
-  } catch {
-    return {};
-  }
-}
-
-function roleClaimsOf(payload: Record<string, unknown>) {
-  const roleKeys = Object.keys(payload).filter(
-    (key) => key.startsWith("urn:zitadel:iam:org:") && (key.includes("roles") || key.includes("group"))
-  );
-  return Object.fromEntries(roleKeys.map((key) => [key, payload[key]]));
-}
-
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const code = searchParams.get("code");
@@ -78,14 +60,6 @@ export async function GET(request: NextRequest) {
   const roles = [...new Set([...idTokenRoles, ...userinfoRoles])];
   const allowedRoles = roles.filter((role) => STAFF_ROLES.includes(role));
   if (!allowedRoles.length) {
-    console.error("[auth] DEBUG forbidden_role", JSON.stringify({
-      sub: (claims as Record<string, unknown>).sub,
-      idTokenRoleClaims: roleClaimsOf(claims as Record<string, unknown>),
-      accessTokenRoleClaims: roleClaimsOf(peekPayload(tokens.access_token)),
-      accessTokenAud: peekPayload(tokens.access_token).aud,
-      idTokenRoles,
-      userinfoRoles,
-    }, null, 2));
     return redirectToLogin(request, "forbidden_role");
   }
 

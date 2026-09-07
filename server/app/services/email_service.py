@@ -5,7 +5,6 @@ from ..templating import render_template
 
 EMAIL_ENDPOINT = "/api/v1/emails/send-html"
 DEFAULT_FROM = "spsm@mits.edu.my"
-PARENT_PLACEHOLDER_EMAIL = "ibu-bapa-placeholder@mits.edu.my"
 
 
 def send_html(to_email: str, subject: str, html_content: str, from_email: str = DEFAULT_FROM) -> bool:
@@ -44,21 +43,3 @@ def notify_case_created(case, origin: str) -> None:
         points=case["points"],
     )
     send_html("guru-disiplin@mits.edu.my", subject, html)
-
-
-def notify_b03_review(case, pengawas_email: str, approved: bool) -> None:
-    html = render_template("emails/b03_review.html", case_id=case["id"], approved=approved)
-    send_html(
-        pengawas_email,
-        f"SPSM: Kad Peringatan {case['id']} {'disahkan' if approved else 'ditolak'}",
-        html,
-    )
-
-
-def notify_parent_letter(case, level: str) -> None:
-    html = render_template("emails/parent_letter.html", case_id=case["id"], level=level)
-    send_html(
-        PARENT_PLACEHOLDER_EMAIL,
-        f"SPSM: Surat Pemberitahuan / Amaran {level} - {case['id']}",
-        html,
-    )

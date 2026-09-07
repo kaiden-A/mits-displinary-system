@@ -15,8 +15,20 @@ CATEGORIES = {
     "N": "Kes Khas",
 }
 
+from typing import NamedTuple
+
+
+class Offence(NamedTuple):
+    code: str
+    category: str
+    name: str
+    min_points: int
+    max_points: int
+    action: str = ""
+
+
 # (code, cat, name, min, max, action)
-OFFENCES = [
+_OFFENCE_DATA = [
     ("A01", "A", "Berjudi / bertaruh (secara besar-besaran)", 40, 50, ""),
     ("A02", "A", "Mencuri", 40, 50, ""),
     ("A03", "A", "Mengancam / memukul / mencederakan guru", 40, 50, ""),
@@ -164,6 +176,8 @@ OFFENCES = [
     ("N10", "N", "Ajaran sesat dan militan", 40, 50, ""),
 ]
 
+OFFENCES: list[Offence] = [Offence(*row) for row in _OFFENCE_DATA]
+
 LADDER = [
     {"tier": 1, "up_to": 5, "label": "Peringkat 1 (2-5 mata)", "steps": ["Diberi amaran bertulis.", "Diberi tarbiah / membuat khidmat sosial."]},
     {"tier": 2, "up_to": 10, "label": "Peringkat 2 (6-10 mata)", "steps": ["Murid mengisi Borang Pengakuan Murid (B05).", "Hubungi ibu bapa / penjaga.", "Mengeluarkan surat pemberitahuan / surat amaran (B06).", "Diberi tarbiah / membuat khidmat sosial."]},
@@ -174,22 +188,22 @@ LADDER = [
 ]
 
 
-def offence_by_code(code: str):
+def offence_by_code(code: str) -> Offence | None:
     for row in OFFENCES:
-        if row[0] == code:
+        if row.code == code:
             return row
     return None
 
 
-def prefect_allowed():
-    return [row for row in OFFENCES if row[4] <= 5]
+def prefect_allowed() -> list[Offence]:
+    return [row for row in OFFENCES if row.max_points <= 5]
 
 
 def involves_confiscation(code: str) -> bool:
     row = offence_by_code(code)
     if not row:
         return False
-    action = (row[5] or "").lower()
+    action = (row.action or "").lower()
     return "rampas" in action or "sita" in action
 
 
@@ -213,3 +227,59 @@ def required_forms(points: int) -> list[dict]:
     if points >= 21:
         forms.append({"code": "B08", "name": "Surat Akujanji" if points >= 31 else "Surat Perjanjian"})
     return forms
+
+
+HEAVY_PATH = [
+    "STUDENT_ACK", "ACTION_PREPARED", "PRINCIPAL_APPROVAL",
+    "EXECUTED", "PARENT_NOTIFIED", "MEETING", "CLOSED",
+]
+LIGHT_PATH = ["EXECUTED", "CLOSED"]
+
+
+def needs_b02(source: str, points: int) -> bool:
+    return source == "SPOT_CHECK" or (source == "COMPLAINT" and points > 5)
+
+
+def path_for(source: str, points: int) -> list[str]:
+    path = (
+        ["REPORTED", "INVESTIGATING", "CONFIRMED", "RECORDED"]
+        if needs_b02(source, points)
+        else ["REPORTED", "RECORDED"]
+    )
+    path.extend(HEAVY_PATH if tier_for(points)["tier"] >= 2 else LIGHT_PATH)
+    return path
+
+
+DOC_NAMES = {
+    "b01": "Borang aduan",
+    "b02": "Laporan siasatan",
+    "b03": "Kad peringatan",
+    "b04": "Rekod disiplin",
+    "b07": "Barang rampasan",
+    "kad": "Kad SPSM",
+}
+
+
+def case_doc_requirements(source: str, points: int, offence_codes: list[str]) -> list[dict]:
+    """Documents a case needs, in display order. Single source for the ladder rules."""
+    tier = tier_for(points)["tier"]
+    ids: list[str] = []
+    if source == "PREFECT_WARNING":
+        ids += ["b03", "b04"]
+    else:
+        ids += ["b01", "b04"]
+        if needs_b02(source, points):
+            ids.insert(1, "b02")
+    form_names = {form["code"].lower(): form["name"] for form in required_forms(points)}
+    if tier >= 2:
+        ids += ["b05", "b06"]
+    if tier >= 4:
+        ids += ["b08"]
+    if any(involves_confiscation(code) for code in offence_codes):
+        ids += ["b07"]
+    ids += ["kad"]
+    names = {**DOC_NAMES, **form_names}
+    return [
+        {"id": code, "code": "Kad SPSM" if code == "kad" else code.upper(), "name": names.get(code, code.upper())}
+        for code in ids
+    ]

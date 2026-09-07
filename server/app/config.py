@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     student_data_api: str = ""
 
     app_secret: str = "dev-only-secret-change-me"
+    dev_login_enabled: bool = True  # DEV ONLY — set false in production
     pengawas_session_minutes: int = 15
     pengawas_max_failed: int = 5
     pengawas_lock_minutes: int = 15

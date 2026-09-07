@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session, selectinload
 from ..models import B02Form, Case, CaseDoc, CaseEvent, CaseOffence, Notification
 from ..roles import GURU_BIASA, MANAGER_ROLES, MANAGER_ROLE_ORDER, PENGAWAS, STAFF_ROLES, SUPER_ADMIN
 from ..schemas import CaseCreate, Principal
-from ..seed import prefect_allowed
+from ..seed import needs_b02, prefect_allowed
 from . import email_service, workflow
 from .students_service import get_student
 
@@ -90,14 +90,14 @@ def _validate_offences(db: Session, offences) -> int:
         row = offence_by_code(off.code)
         if row is None:
             raise HTTPException(status_code=422, detail=f"unknown offence code: {off.code}")
-        if off.points < row[3] or off.points > row[4]:
+        if off.points < row.min_points or off.points > row.max_points:
             raise HTTPException(status_code=422, detail=f"points out of range for {off.code}")
         total += off.points
     return total
 
 
 def _validate_prefect(offences) -> int:
-    allowed = {row[0] for row in prefect_allowed()}
+    allowed = {row.code for row in prefect_allowed()}
     total = 0
     for off in offences:
         if off.code not in allowed:
@@ -183,12 +183,8 @@ def create_case(db: Session, payload: CaseCreate, principal: Principal) -> Case:
 
 
 def add_b02(db: Session, case_id: int, fields: dict, principal: Principal) -> B02Form:
-    case = db.get(Case, case_id)
-    if not case:
-        raise HTTPException(status_code=404, detail="case not found")
-    if not can_view_case(case, principal):
-        raise HTTPException(status_code=403, detail="not your case")
-    if not workflow.needs_b02(case.source, case.points):
+    case = _get_case(db, case_id, principal)
+    if not needs_b02(case.source, case.points):
         raise HTTPException(status_code=422, detail="case does not require B02")
     if case.status not in {"REPORTED", "INVESTIGATING"}:
         raise HTTPException(status_code=422, detail="B02 may only be added while case is reported or investigating")
@@ -231,13 +227,7 @@ def add_b02(db: Session, case_id: int, fields: dict, principal: Principal) -> B0
 
 
 def review_b02(db: Session, case_id: int, form_id: int, principal: Principal) -> B02Form:
-    case = db.get(Case, case_id)
-    if not case:
-        raise HTTPException(status_code=404, detail="case not found")
-    if not can_view_case(case, principal):
-        raise HTTPException(status_code=403, detail="not your case")
-    if not is_manager(principal):
-        raise HTTPException(status_code=403, detail="role may not review B02")
+    case = _get_case(db, case_id, principal, manager=True, manager_msg="role may not review B02")
 
     form = next((f for f in case.b02_forms if f.id == form_id), None)
     if not form:
@@ -328,13 +318,7 @@ def _record_b05_acknowledgement(case: Case, principal: Principal, actor_role: st
 
 def add_counselling_session(db: Session, case_id: int, session_fields: dict, principal: Principal) -> Case:
     """Append one counselling session record. Mandatory for tiers 3-5 (11-40 mata)."""
-    case = db.get(Case, case_id)
-    if not case:
-        raise HTTPException(status_code=404, detail="case not found")
-    if not can_view_case(case, principal):
-        raise HTTPException(status_code=403, detail="not your case")
-    if not is_manager(principal):
-        raise HTTPException(status_code=403, detail="role may not record counselling sessions")
+    case = _get_case(db, case_id, principal, manager=True, manager_msg="role may not record counselling sessions")
     if case.points < 11:
         raise HTTPException(status_code=422, detail="counselling is only required from Peringkat 3 (11 mata)")
 
@@ -358,13 +342,7 @@ def add_counselling_session(db: Session, case_id: int, session_fields: dict, pri
 
 def set_punishment(db: Session, case_id: int, punishment: dict, principal: Principal) -> Case:
     """Record the tier-5 punishment (gantung asrama / gantung sekolah / rotan)."""
-    case = db.get(Case, case_id)
-    if not case:
-        raise HTTPException(status_code=404, detail="case not found")
-    if not can_view_case(case, principal):
-        raise HTTPException(status_code=403, detail="not your case")
-    if not is_manager(principal):
-        raise HTTPException(status_code=403, detail="role may not record punishment")
+    case = _get_case(db, case_id, principal, manager=True, manager_msg="role may not record punishment")
     if not 31 <= case.points <= 40:
         raise HTTPException(status_code=422, detail="punishment record is only for Peringkat 5 (31-40 mata)")
 
@@ -385,13 +363,7 @@ def set_punishment(db: Session, case_id: int, punishment: dict, principal: Princ
 
 
 def patch_doc(db: Session, case_id: int, doc_code: str, data: dict, principal: Principal) -> CaseDoc:
-    case = db.get(Case, case_id)
-    if not case:
-        raise HTTPException(status_code=404, detail="case not found")
-    if not can_view_case(case, principal):
-        raise HTTPException(status_code=403, detail="not your case")
-    if not set(principal.roles).intersection(MANAGER_ROLES):
-        raise HTTPException(status_code=403, detail="role may not edit case documents")
+    case = _get_case(db, case_id, principal, manager=True, manager_msg="role may not edit case documents")
     doc = next((d for d in case.docs if d.doc_code == doc_code), None)
     if doc is None:
         doc = CaseDoc(doc_code=doc_code, data=data)
@@ -404,13 +376,7 @@ def patch_doc(db: Session, case_id: int, doc_code: str, data: dict, principal: P
 
 
 def patch_meeting(db: Session, case_id: int, meeting: dict, principal: Principal) -> Case:
-    case = db.get(Case, case_id)
-    if not case:
-        raise HTTPException(status_code=404, detail="case not found")
-    if not can_view_case(case, principal):
-        raise HTTPException(status_code=403, detail="not your case")
-    if not is_manager(principal):
-        raise HTTPException(status_code=403, detail="role may not edit meeting records")
+    case = _get_case(db, case_id, principal, manager=True, manager_msg="role may not edit meeting records")
     case.meeting = meeting
     case.events.append(
         CaseEvent(
@@ -430,6 +396,24 @@ def can_view_case(case: Case, principal: Principal) -> bool:
     if GURU_BIASA in principal.roles:
         return case.reporter_sub == principal.sub
     return False
+
+
+def _get_case(
+    db: Session,
+    case_id: int,
+    principal: Principal,
+    *,
+    manager: bool = False,
+    manager_msg: str = "role may not act on this case",
+) -> Case:
+    case = db.get(Case, case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail="case not found")
+    if not can_view_case(case, principal):
+        raise HTTPException(status_code=403, detail="not your case")
+    if manager and not is_manager(principal):
+        raise HTTPException(status_code=403, detail=manager_msg)
+    return case
 
 
 def case_visible_query(principal: Principal):

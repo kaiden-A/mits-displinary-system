@@ -14,7 +14,7 @@ export default async function DashboardPage() {
   let error = "";
   try { cases = await apiFetch<CaseSummary[]>("/cases?limit=200", session.access_token); } catch (reason) { error = reason instanceof Error ? reason.message : "Data tidak dapat dimuatkan."; }
   const review = cases.filter((item) => item.source === "PREFECT_WARNING" && item.status === "REPORTED");
-  const investigation = cases.filter((item) => item.status === "REPORTED" && (item.source === "SPOT_CHECK" || (item.source === "COMPLAINT" && item.points > 5)));
+  const investigation = cases.filter((item) => item.status === "REPORTED" && (item.source === "SPOT_CHECK" || (item.source === "COMPLAINT" && (item.tier ?? 0) >= 2)));
   const signing = cases.filter((item) => item.status === "PRINCIPAL_APPROVAL");
   const active = cases.filter((item) => !["CLOSED", "DISMISSED"].includes(item.status));
   const role = session.roles.includes("pentadbir") || session.roles.includes("super_admin") ? "Pentadbir" : "Guru disiplin";

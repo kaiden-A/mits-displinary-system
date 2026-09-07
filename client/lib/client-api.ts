@@ -61,8 +61,6 @@ export const ROLE_LABELS: Record<string, string> = {
   pengawas: "Pengawas",
 };
 
-export const CASE_PATH = ["REPORTED", "INVESTIGATING", "CONFIRMED", "RECORDED", "STUDENT_ACK", "ACTION_PREPARED", "PRINCIPAL_APPROVAL", "EXECUTED", "PARENT_NOTIFIED", "MEETING", "CLOSED"];
-
 export function statusTone(status: string): "green" | "gold" | "red" | "blue" | "neutral" {
   if (["CLOSED", "RECORDED", "EXECUTED", "CONFIRMED"].includes(status)) return "green";
   if (["REPORTED", "STUDENT_ACK", "ACTION_PREPARED", "PRINCIPAL_APPROVAL", "PARENT_NOTIFIED", "MEETING"].includes(status)) return "gold";

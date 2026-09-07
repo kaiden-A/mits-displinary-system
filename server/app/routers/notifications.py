@@ -34,7 +34,9 @@ def mark_read(notification_id: int, db: Session = Depends(get_db), principal: Pr
     notification = db.get(Notification, notification_id)
     if not notification:
         return {"ok": False}
-    if notification.recipient_sub not in (None, principal.sub):
+    addressed_to_sub = notification.recipient_sub in (None, principal.sub)
+    addressed_to_role = bool(notification.recipient_role) and notification.recipient_role in principal.roles
+    if not (addressed_to_sub or addressed_to_role):
         return {"ok": False}
     notification.read = True
     db.commit()

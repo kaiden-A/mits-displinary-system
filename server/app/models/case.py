@@ -109,7 +109,9 @@ class Notification(Base):
     recipient_sub: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     recipient_role: Mapped[str | None] = mapped_column(String(30), nullable=True, index=True)
     ntype: Mapped[str] = mapped_column(String(30))
-    case_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    case_id: Mapped[int | None] = mapped_column(
+        ForeignKey("cases.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     text: Mapped[str] = mapped_column(Text)
     read: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)

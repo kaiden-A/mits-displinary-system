@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { use, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { clientApi, CASE_PATH, formatDate, formatDateTime, roleLabel, sourceLabel, STATUS_DETAIL_LABELS, STATUS_LABELS } from "@/lib/client-api";
-import type { B02Form, CaseDetail, CaseStep } from "@/lib/types";
+import { clientApi, formatDate, formatDateTime, roleLabel, sourceLabel, STATUS_DETAIL_LABELS, STATUS_LABELS } from "@/lib/client-api";
+import type { B02Form, CaseDetail, CaseStep, RequiredDoc } from "@/lib/types";
 import { canAct } from "@/lib/permissions";
 import { MANAGER_ROLES } from "@/lib/roles";
 import { Alert, Button, Card, EmptyState, Icon, PageHeader, PointsBadge, SectionTitle, StatusBadge } from "@/components/ui";
@@ -46,11 +46,6 @@ const B02_EDIT_FIELDS = [
   ["saksi", "Saksi (jika ada)"], ["bukti", "Bahan sokongan / bukti (jika ada)"],
 ] as const;
 
-const DOCS = [
-  ["b01", "B01", "Borang aduan"], ["b02", "B02", "Laporan siasatan"], ["b03", "B03", "Kad peringatan"], ["b04", "B04", "Rekod disiplin"],
-  ["b05", "B05", "Pengakuan murid"], ["b06", "B06", "Surat pemberitahuan / amaran"], ["b07", "B07", "Barang rampasan"], ["b08", "B08", "Surat akujanji"], ["kad", "Kad SPSM", "Rekod pembangunan sahsiah"],
-] as const;
-
 function todayISO() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
@@ -62,6 +57,7 @@ export default function CaseWorkspace({ id, roles, authType, name }: { id: strin
   const params = useSearchParams();
   const [caseData, setCaseData] = useState<CaseDetail | null>(null);
   const [steps, setSteps] = useState<CaseStep[]>([]);
+  const [docRequirements, setDocRequirements] = useState<RequiredDoc[]>([]);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [docFields, setDocFields] = useState<Record<string, string>>({});
   const [meetingFields, setMeetingFields] = useState<Record<string, string>>({});
@@ -77,9 +73,10 @@ export default function CaseWorkspace({ id, roles, authType, name }: { id: strin
     setLoading(true);
     try {
       const data = await clientApi<CaseDetail>(`/cases/${id}`);
+      const stepsRes = await clientApi<{ steps: CaseStep[]; required_docs: RequiredDoc[] }>(`/cases/${id}/steps`);
       setCaseData(data);
-      const next = await clientApi<CaseStep[]>(`/cases/${id}/steps`);
-      setSteps(next);
+      setSteps(stepsRes.steps);
+      setDocRequirements(stepsRes.required_docs);
       const b06 = data.docs.find((doc) => doc.doc_code === "b06")?.data;
       if (b06) setDocFields(Object.fromEntries(Object.entries(b06).map(([key, value]) => [key, String(value ?? "")] )));
       if (b06 && !b06.tarikhSurat) setDocFields((current) => ({ ...current, tarikhSurat: todayISO() }));
@@ -148,8 +145,8 @@ export default function CaseWorkspace({ id, roles, authType, name }: { id: strin
   if (error && !caseData) return <div className="mx-auto max-w-[760px]"><Alert tone="danger">{error} Cuba kembali ke <Link href="/kes" className="font-bold underline">senarai kes</Link> dan buka semula rekod ini.</Alert></div>;
   if (!caseData) return null;
   const c = caseData;
-  const path = casePath(c.source, c.points);
-  const requiredDocs = requiredDocuments(c);
+  const path = c.path;
+  const requiredDocs = requiredDocuments(docRequirements, c);
   const currentStep = steps.find((step) => step.action && canAct(fakeSession, step.action));
   const sourcePrintId = c.source === "PREFECT_WARNING" ? "b03" : c.source === "SPOT_CHECK" ? "b02" : "b01";
 
@@ -233,26 +230,14 @@ function TimelinePanel({ events }: { events: CaseDetail["events"] }) {
   return <Card className="p-5"><SectionTitle title="Kronologi kes" description="Setiap perubahan direkod untuk rujukan dan audit." />{events.length ? <div className="space-y-5">{[...events].reverse().map((event, index) => <div key={`${event.ts}-${index}`} className="flex gap-3"><div className="flex flex-col items-center"><span className={`mt-1 h-3 w-3 shrink-0 rounded-full ${index === 0 ? "bg-gold-500 ring-4 ring-gold-100" : "bg-ink-300"}`} />{index < events.length - 1 ? <span className="mt-1 w-px flex-1 bg-ink-200" /> : null}</div><div className="min-w-0 pb-1"><p className="text-sm leading-6 text-ink-800">{event.text}</p><p className="mt-1 text-xs text-ink-500">{formatDateTime(event.ts)} · {event.by_name || "Sistem"}{event.by_role ? ` · ${roleLabel(event.by_role)}` : ""}</p></div></div>)}</div> : <EmptyState icon="clock" title="Belum ada kronologi" description="Aktiviti kes akan muncul selepas laporan atau tindakan direkodkan." />}</Card>;
 }
 
-function casePath(source: string, points: number) {
-  if (source === "SPOT_CHECK" || (source === "COMPLAINT" && points > 5)) return CASE_PATH;
-  return ["REPORTED", "RECORDED", ...(points >= 6 ? ["STUDENT_ACK", "ACTION_PREPARED", "PRINCIPAL_APPROVAL"] : []), "EXECUTED", ...(points >= 6 ? ["PARENT_NOTIFIED", "MEETING"] : []), "CLOSED"];
-}
-
-function requiredDocuments(caseData: CaseDetail) {
+function requiredDocuments(docs: RequiredDoc[], caseData: CaseDetail) {
   const existing = new Set(caseData.docs.map((doc) => doc.doc_code));
-  const codes = caseData.source === "PREFECT_WARNING" ? ["b04"] : ["b01", "b04"];
-  if (caseData.source === "PREFECT_WARNING") codes.splice(0, 0, "b03");
-  if (caseData.source === "SPOT_CHECK" || (caseData.source === "COMPLAINT" && caseData.points > 5)) codes.splice(1, 0, "b02");
-  if (caseData.points >= 6) codes.push("b05", "b06");
-  if (caseData.points >= 21) codes.push("b08");
-  if (caseData.offences.some((offence) => ["D02", "D03", "J01", "J06", "L09", "L13", "L15"].includes(offence.code))) codes.push("b07");
-  codes.push("kad");
-  return codes.map((code) => {
-    const item = DOCS.find(([id]) => id === code);
-    const names: Record<string, string> = {
-      b06: caseData.points >= 31 ? "Surat Pemberitahuan / Surat Amaran Terakhir" : "Surat Pemberitahuan / Amaran",
-      b08: caseData.points >= 31 ? "Surat Akujanji" : "Surat Perjanjian",
-    };
-    return { id: code, code: item?.[1] || code.toUpperCase(), name: names[code] || item?.[2] || code, filled: existing.has(code) || (code === "b01" && caseData.source !== "PREFECT_WARNING") || (code === "b02" && caseData.b02_forms.length > 0) || (code === "b04" && !["REPORTED", "DISMISSED"].includes(caseData.status)) };
-  });
+  return docs.map((doc) => ({
+    ...doc,
+    filled:
+      existing.has(doc.id) ||
+      (doc.id === "b01" && caseData.source !== "PREFECT_WARNING") ||
+      (doc.id === "b02" && caseData.b02_forms.length > 0) ||
+      (doc.id === "b04" && !["REPORTED", "DISMISSED"].includes(caseData.status)),
+  }));
 }

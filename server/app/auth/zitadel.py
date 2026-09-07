@@ -1,3 +1,4 @@
+import httpx
 import jwt
 
 from ..config import settings
@@ -32,6 +33,24 @@ def _extract_roles(claims: dict) -> list[str]:
     if isinstance(groups, list):
         roles.update(str(group) for group in groups)
     return sorted(roles)
+
+
+def fetch_userinfo(token: str) -> dict:
+    """Fetch OIDC userinfo for an access token — Zitadel asserts profile
+    claims (email/name) here even when the access token itself carries none."""
+    if not settings.zitadel_issuer:
+        return {}
+    try:
+        res = httpx.get(
+            f"{settings.zitadel_issuer.rstrip('/')}/oidc/v1/userinfo",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=10,
+        )
+        if res.status_code != 200:
+            return {}
+        return res.json()
+    except httpx.HTTPError:
+        return {}
 
 
 def validate_staff_token(token: str) -> Principal:
